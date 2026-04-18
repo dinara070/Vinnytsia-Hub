@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вінниця Hub</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700&family=Raleway:wght@300;400;500;600&display=swap');
+
+:root {
+  --gold: #C8A96E;
+  --gold-light: #E8C98E;
+  --dark: #0D0D0D;
+  --dark2: #141414;
+  --dark3: #1C1C1C;
+  --dark4: #242424;
+  --text: #F0EDE8;
+  --text-muted: #8A8478;
+  --accent: #4A90D9;
+  --green: #4CAF80;
+  --red: #E85454;
+  --border: rgba(200,169,110,0.15);
+  --border-bright: rgba(200,169,110,0.35);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--dark);
+  color: var(--text);
+  font-family: 'Raleway', sans-serif;
+  overflow-x: hidden;
+}
+
+/* ========== NAV ========== */
+.nav {
+  position: fixed; top:0; left:0; right:0; z-index:100;
+  background: rgba(13,13,13,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem;
+  height: 64px;
+}
+.nav-logo {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 1rem; font-weight: 700;
+  color: var(--gold); letter-spacing: 0.1em;
+}
+.nav-logo span { color: var(--text); font-weight: 300; }
+.nav-links { display: flex; gap: 2rem; }
+.nav-links a {
+  color: var(--text-muted); text-decoration: none;
+  font-size: 0.8rem; letter-spacing: 0.05em; font-weight: 500;
+  transition: color 0.2s; cursor: pointer;
+}
+.nav-links a:hover, .nav-links a.active { color: var(--gold); }
+.nav-right { display: flex; gap: 0.75rem; align-items: center; }
+.btn-sm {
+  padding: 0.4rem 1rem; border-radius: 4px;
+  font-family: 'Raleway', sans-serif; font-size: 0.75rem;
+  cursor: pointer; transition: all 0.2s; font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.btn-outline { background: transparent; border: 1px solid var(--border-bright); color: var(--gold); }
+.btn-outline:hover { background: rgba(200,169,110,0.1); }
+.btn-gold { background: var(--gold); border: 1px solid var(--gold); color: var(--dark); }
+.btn-gold:hover { background: var(--gold-light); }
+
+/* ========== PAGES ========== */
+.page { display: none; padding-top: 64px; min-height: 100vh; }
+.page.active { display: block; }
+
+/* ========== HERO ========== */
+.hero {
+  min-height: calc(100vh - 64px);
+  position: relative; overflow: hidden;
+  display: flex; align-items: center;
+}
+#hero-canvas {
+  position: absolute; top:0; left:0; right:0; bottom:0;
+  width: 100%; height: 100%;
+}
+.hero-content {
+  position: relative; z-index: 2;
+  padding: 4rem 4rem 4rem 4rem;
+  max-width: 600px;
+}
+.hero-tag {
+  display: inline-block;
+  background: rgba(200,169,110,0.1);
+  border: 1px solid var(--border-bright);
+  color: var(--gold); font-size: 0.7rem; letter-spacing: 0.15em;
+  padding: 0.35rem 0.75rem; border-radius: 2px; margin-bottom: 1.5rem;
+  font-family: 'Unbounded', sans-serif; font-weight: 400;
+}
+.hero h1 {
+  font-family: 'Unbounded', sans-serif;
+  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  font-weight: 700; line-height: 1.1;
+  margin-bottom: 1.5rem;
+}
+.hero h1 .line2 { color: var(--gold); }
+.hero p {
+  font-size: 1rem; color: var(--text-muted); line-height: 1.7;
+  margin-bottom: 2rem; max-width: 440px;
+}
+.hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; }
+.btn-lg {
+  padding: 0.85rem 2rem; border-radius: 4px;
+  font-family: 'Raleway', sans-serif; font-size: 0.85rem;
+  cursor: pointer; transition: all 0.25s; font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.btn-lg.gold { background: var(--gold); border: 1px solid var(--gold); color: var(--dark); }
+.btn-lg.gold:hover { background: var(--gold-light); transform: translateY(-2px); }
+.btn-lg.outline { background: transparent; border: 1px solid var(--border-bright); color: var(--text); }
+.btn-lg.outline:hover { border-color: var(--gold); color: var(--gold); }
+.hero-stats {
+  position: absolute; bottom: 3rem; left: 4rem; right: 4rem; z-index: 2;
+  display: flex; gap: 3rem;
+}
+.hero-stat .num {
+  font-family: 'Unbounded', sans-serif; font-size: 1.8rem;
+  font-weight: 700; color: var(--gold);
+}
+.hero-stat .label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+/* Gradient overlay for hero */
+.hero-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(105deg, rgba(13,13,13,0.92) 0%, rgba(13,13,13,0.7) 50%, rgba(13,13,13,0.3) 100%);
+}
+
+/* ========== SECTION ========== */
+.section { padding: 5rem 4rem; }
+.section-header { margin-bottom: 3rem; }
+.section-tag {
+  font-family: 'Unbounded', sans-serif; font-size: 0.65rem;
+  color: var(--gold); letter-spacing: 0.2em; margin-bottom: 0.75rem;
+  display: block;
+}
+.section-title {
+  font-family: 'Unbounded', sans-serif; font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 600; line-height: 1.2;
+}
+
+/* ========== MAP SECTION ========== */
+.map-section { background: var(--dark2); }
+.map-wrap {
+  display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start;
+}
+#map-canvas {
+  width: 100%; aspect-ratio: 16/9;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--dark3); cursor: grab;
+}
+#map-canvas:active { cursor: grabbing; }
+.map-legend { display: flex; flex-direction: column; gap: 1rem; }
+.map-pin {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem 1.25rem;
+  cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: flex-start; gap: 0.75rem;
+}
+.map-pin:hover { border-color: var(--border-bright); transform: translateX(4px); }
+.map-pin.active { border-color: var(--gold); background: rgba(200,169,110,0.05); }
+.pin-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(200,169,110,0.15); display: flex; align-items: center;
+  justify-content: center; font-size: 1rem; flex-shrink: 0;
+}
+.pin-name { font-family: 'Unbounded', sans-serif; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; }
+.pin-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+.pin-coins {
+  margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 0.3rem;
+  background: rgba(200,169,110,0.1); padding: 0.2rem 0.5rem; border-radius: 3px;
+  font-size: 0.7rem; color: var(--gold); font-weight: 600;
+}
+
+/* ========== QUESTS ========== */
+.quests-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem;
+}
+.quest-card {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.5rem; transition: all 0.25s;
+  position: relative; overflow: hidden;
+}
+.quest-card::before {
+  content: ''; position: absolute; top:0; left:0; right:0; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.quest-card:hover { border-color: var(--border-bright); transform: translateY(-4px); }
+.quest-card:hover::before { opacity: 1; }
+.quest-difficulty {
+  display: inline-block; font-size: 0.65rem; letter-spacing: 0.1em;
+  padding: 0.2rem 0.6rem; border-radius: 3px; margin-bottom: 1rem; font-weight: 600;
+}
+.diff-easy { background: rgba(76,175,128,0.15); color: var(--green); }
+.diff-med { background: rgba(200,169,110,0.15); color: var(--gold); }
+.diff-hard { background: rgba(232,84,84,0.15); color: var(--red); }
+.quest-name {
+  font-family: 'Unbounded', sans-serif; font-size: 0.85rem; font-weight: 600;
+  margin-bottom: 0.5rem; line-height: 1.3;
+}
+.quest-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1rem; }
+.quest-meta { display: flex; align-items: center; justify-content: space-between; }
+.quest-reward { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--gold); font-weight: 600; }
+.quest-progress-wrap { margin-top: 0.75rem; }
+.quest-progress-bar {
+  background: var(--dark4); border-radius: 2px; height: 4px; overflow: hidden;
+}
+.quest-progress-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+  transition: width 0.5s;
+}
+.quest-progress-label { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem; }
+.btn-quest {
+  width: 100%; margin-top: 1rem; padding: 0.6rem;
+  background: transparent; border: 1px solid var(--border-bright); color: var(--gold);
+  border-radius: 6px; cursor: pointer; font-family: 'Raleway', sans-serif;
+  font-size: 0.8rem; font-weight: 600; letter-spacing: 0.05em; transition: all 0.2s;
+}
+.btn-quest:hover { background: rgba(200,169,110,0.1); }
+
+/* ========== DASHBOARD ========== */
+.dashboard-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;
+}
+.stat-card {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.5rem;
+}
+.stat-num {
+  font-family: 'Unbounded', sans-serif; font-size: 2rem; font-weight: 700;
+  color: var(--gold); margin-bottom: 0.25rem;
+}
+.stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; }
+.stat-bar { background: var(--dark4); border-radius: 2px; height: 4px; }
+.stat-bar-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+}
+.visited-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;
+}
+.visited-item {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem; display: flex; align-items: center; gap: 0.75rem;
+}
+.visited-icon {
+  width: 40px; height: 40px; border-radius: 8px;
+  background: rgba(200,169,110,0.1); display: flex; align-items: center;
+  justify-content: center; font-size: 1.2rem; flex-shrink: 0;
+}
+.visited-name { font-size: 0.8rem; font-weight: 500; margin-bottom: 0.2rem; }
+.visited-date { font-size: 0.7rem; color: var(--text-muted); }
+.visited-coins { font-size: 0.7rem; color: var(--gold); font-weight: 600; }
+.coins-total {
+  background: linear-gradient(135deg, var(--dark3), rgba(200,169,110,0.05));
+  border: 1px solid var(--border-bright); border-radius: 12px;
+  padding: 2rem; display: flex; align-items: center; gap: 2rem; margin-bottom: 2rem;
+}
+.coins-icon { font-size: 3rem; }
+.coins-amount {
+  font-family: 'Unbounded', sans-serif; font-size: 3rem;
+  font-weight: 700; color: var(--gold);
+}
+.coins-sublabel { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+/* ========== CHATBOT ========== */
+.chat-layout { display: grid; grid-template-columns: 280px 1fr; gap: 2rem; align-items: start; }
+.chat-sidebar {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.5rem;
+}
+.chat-sidebar h3 {
+  font-family: 'Unbounded', sans-serif; font-size: 0.8rem;
+  font-weight: 600; margin-bottom: 1rem; color: var(--gold);
+}
+.chat-feature {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+}
+.chat-feature:last-child { border-bottom: none; }
+.cf-icon {
+  width: 32px; height: 32px; border-radius: 6px;
+  background: rgba(200,169,110,0.1); display: flex; align-items: center;
+  justify-content: center; font-size: 0.9rem; flex-shrink: 0;
+}
+.cf-name { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.2rem; }
+.cf-desc { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+.chat-main {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; display: flex; flex-direction: column; height: 520px;
+}
+.chat-header {
+  padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.chat-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+}
+.chat-bot-name { font-weight: 600; font-size: 0.9rem; }
+.chat-status { font-size: 0.72rem; color: var(--green); }
+.chat-online { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 4px; }
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+  scrollbar-width: thin; scrollbar-color: var(--dark4) transparent;
+}
+.msg { max-width: 80%; }
+.msg.bot { align-self: flex-start; }
+.msg.user { align-self: flex-end; }
+.msg-bubble {
+  padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; line-height: 1.6;
+}
+.msg.bot .msg-bubble {
+  background: var(--dark4); border: 1px solid var(--border); border-radius: 4px 12px 12px 12px;
+}
+.msg.user .msg-bubble {
+  background: rgba(200,169,110,0.15); border: 1px solid var(--border-bright); color: var(--text);
+  border-radius: 12px 4px 12px 12px;
+}
+.msg-time { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.3rem; padding: 0 0.25rem; }
+.msg.user .msg-time { text-align: right; }
+.quick-replies { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.qr {
+  padding: 0.35rem 0.75rem; border-radius: 20px;
+  border: 1px solid var(--border-bright); color: var(--gold);
+  font-size: 0.75rem; cursor: pointer; transition: all 0.2s;
+  background: transparent; font-family: 'Raleway', sans-serif;
+}
+.qr:hover { background: rgba(200,169,110,0.1); }
+.chat-input-wrap {
+  padding: 1rem 1.5rem; border-top: 1px solid var(--border);
+  display: flex; gap: 0.75rem; align-items: center;
+}
+.chat-input {
+  flex: 1; background: var(--dark4); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.65rem 1rem; color: var(--text);
+  font-family: 'Raleway', sans-serif; font-size: 0.85rem; outline: none;
+  transition: border-color 0.2s;
+}
+.chat-input:focus { border-color: var(--border-bright); }
+.chat-input::placeholder { color: var(--text-muted); }
+.chat-send {
+  width: 38px; height: 38px; border-radius: 8px;
+  background: var(--gold); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; transition: all 0.2s; flex-shrink: 0;
+}
+.chat-send:hover { background: var(--gold-light); transform: scale(1.05); }
+.typing { display: flex; gap: 4px; align-items: center; padding: 0.75rem 1rem; }
+.typing span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-muted); animation: bounce 1.2s infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+/* ========== SITES ========== */
+.sites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+.site-card {
+  background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden; transition: all 0.25s; cursor: pointer;
+}
+.site-card:hover { border-color: var(--border-bright); transform: translateY(-4px); }
+.site-thumb {
+  height: 140px; background: var(--dark4); position: relative;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.site-thumb-inner {
+  font-size: 3rem; opacity: 0.3;
+}
+.site-url-badge {
+  position: absolute; bottom: 8px; left: 8px;
+  background: rgba(13,13,13,0.8); border: 1px solid var(--border);
+  padding: 0.2rem 0.5rem; border-radius: 3px;
+  font-size: 0.65rem; color: var(--text-muted); font-family: monospace;
+}
+.site-body { padding: 1.25rem; }
+.site-name { font-family: 'Unbounded', sans-serif; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; }
+.site-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem; }
+.site-link {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.78rem; color: var(--gold); font-weight: 600;
+  text-decoration: none; transition: gap 0.2s;
+}
+.site-link:hover { gap: 0.5rem; }
+
+/* ========== FOOTER ========== */
+.footer {
+  background: var(--dark2); border-top: 1px solid var(--border);
+  padding: 3rem 4rem; margin-top: 4rem;
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem;
+}
+.footer-brand .logo {
+  font-family: 'Unbounded', sans-serif; font-size: 1rem; font-weight: 700;
+  color: var(--gold); margin-bottom: 1rem;
+}
+.footer-desc { font-size: 0.82rem; color: var(--text-muted); line-height: 1.7; }
+.footer-col h4 {
+  font-family: 'Unbounded', sans-serif; font-size: 0.7rem; font-weight: 600;
+  color: var(--gold); letter-spacing: 0.1em; margin-bottom: 1rem;
+}
+.footer-col ul { list-style: none; }
+.footer-col li { margin-bottom: 0.5rem; }
+.footer-col a {
+  font-size: 0.8rem; color: var(--text-muted); text-decoration: none;
+  transition: color 0.2s; cursor: pointer;
+}
+.footer-col a:hover { color: var(--text); }
+.footer-bottom {
+  background: var(--dark2); border-top: 1px solid var(--border);
+  padding: 1.5rem 4rem; display: flex; align-items: center; justify-content: space-between;
+}
+.footer-bottom p { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ========== TOAST ========== */
+.toast {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 999;
+  background: var(--dark3); border: 1px solid var(--border-bright);
+  border-radius: 8px; padding: 1rem 1.5rem;
+  transform: translateY(100px); opacity: 0;
+  transition: all 0.3s; max-width: 320px;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-title { font-weight: 600; font-size: 0.85rem; color: var(--gold); margin-bottom: 0.25rem; }
+.toast-body { font-size: 0.8rem; color: var(--text-muted); }
+
+/* ========== LOGIN MODAL ========== */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--dark2); border: 1px solid var(--border-bright);
+  border-radius: 16px; padding: 2.5rem; width: 400px; max-width: 90vw;
+  transform: translateY(20px); transition: transform 0.3s;
+}
+.modal-overlay.show .modal { transform: translateY(0); }
+.modal-title {
+  font-family: 'Unbounded', sans-serif; font-size: 1.1rem;
+  font-weight: 700; margin-bottom: 0.5rem;
+}
+.modal-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 2rem; }
+.form-field { margin-bottom: 1rem; }
+.form-field label { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500; }
+.form-field input {
+  width: 100%; background: var(--dark3); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.65rem 0.9rem; color: var(--text);
+  font-family: 'Raleway', sans-serif; font-size: 0.85rem; outline: none;
+  transition: border-color 0.2s;
+}
+.form-field input:focus { border-color: var(--border-bright); }
+.btn-full { width: 100%; padding: 0.85rem; margin-top: 0.5rem; border-radius: 6px; font-size: 0.9rem; }
+.modal-switch { text-align: center; margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted); }
+.modal-switch a { color: var(--gold); cursor: pointer; text-decoration: none; }
+.modal-close {
+  position: absolute; top: 1rem; right: 1rem;
+  background: none; border: none; color: var(--text-muted);
+  font-size: 1.2rem; cursor: pointer; transition: color 0.2s;
+}
+.modal-close:hover { color: var(--text); }
+.modal { position: relative; }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 900px) {
+  .map-wrap { grid-template-columns: 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr 1fr; }
+  .chat-layout { grid-template-columns: 1fr; }
+  .footer { grid-template-columns: 1fr 1fr; }
+  .section { padding: 3rem 1.5rem; }
+  .hero-content { padding: 3rem 1.5rem; }
+  .hero-stats { left: 1.5rem; right: 1.5rem; }
+  .nav-links { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">VINNYTSIA<span> HUB</span></div>
+  <div class="nav-links">
+    <a onclick="showPage('home')" id="nav-home" class="active">ГОЛОВНА</a>
+    <a onclick="showPage('map')" id="nav-map">КАРТА</a>
+    <a onclick="showPage('quests')" id="nav-quests">КВЕСТИ</a>
+    <a onclick="showPage('dashboard')" id="nav-dashboard">КАБІНЕТ</a>
+    <a onclick="showPage('chat')" id="nav-chat">ЧАТ-БОТ</a>
+    <a onclick="showPage('sites')" id="nav-sites">РЕСУРСИ</a>
+  </div>
+  <div class="nav-right">
+    <button class="btn-sm btn-outline" onclick="showModal('login')">Увійти</button>
+    <button class="btn-sm btn-gold" onclick="showModal('register')">Реєстрація</button>
+  </div>
+</nav>
+
+<!-- ========== HOME PAGE ========== -->
+<div id="page-home" class="page active">
+  <section class="hero">
+    <canvas id="hero-canvas"></canvas>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <div class="hero-tag">ТУРИСТИЧНА ЕКОСИСТЕМА</div>
+      <h1>Відкрий<br><span class="line2">Вінницю</span><br>по-новому</h1>
+      <p>Інтерактивна платформа з 3D-картою, квестами, «Вінницькими койнами» та AI-асистентом. Досліджуй місто — заробляй нагороди.</p>
+      <div class="hero-btns">
+        <button class="btn-lg gold" onclick="showModal('register')">Почати подорож</button>
+        <button class="btn-lg outline" onclick="showPage('map')">Відкрити карту</button>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">47</div><div class="label">Локацій на карті</div></div>
+      <div class="hero-stat"><div class="num">12</div><div class="label">Активних квестів</div></div>
+      <div class="hero-stat"><div class="num">3.2K</div><div class="label">Туристів цього місяця</div></div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" style="background:var(--dark2);">
+    <div class="section-header">
+      <span class="section-tag">ЩО МИ ПРОПОНУЄМО</span>
+      <h2 class="section-title">Три кити платформи</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem;">
+      <div class="quest-card" onclick="showPage('map')" style="cursor:pointer;">
+        <div style="font-size:2.5rem;margin-bottom:1rem;">🗺️</div>
+        <div class="quest-name">Інтерактивна 3D-карта</div>
+        <div class="quest-desc">Всі ключові об'єкти Вінниці в одному місці. Вежа Артинова, Садиба Пирогова, Фонтан Roshen та ще 44 локації.</div>
+      </div>
+      <div class="quest-card" onclick="showPage('quests')" style="cursor:pointer;">
+        <div style="font-size:2.5rem;margin-bottom:1rem;">🏆</div>
+        <div class="quest-name">Квести та Вінницькі Койни</div>
+        <div class="quest-desc">Скануй QR-коди на локаціях, проходь маршрути та отримуй «Вінницькі Койни» для обміну на знижки та сувеніри.</div>
+      </div>
+      <div class="quest-card" onclick="showPage('chat')" style="cursor:pointer;">
+        <div style="font-size:2.5rem;margin-bottom:1rem;">🤖</div>
+        <div class="quest-name">AI-асистент «Вінни»</div>
+        <div class="quest-desc">Персональний чат-бот, що веде діалог, бронює столики, додає події в Google Calendar та накладає вінницькі фільтри на фото.</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ========== MAP PAGE ========== -->
+<div id="page-map" class="page">
+  <section class="section map-section">
+    <div class="section-header">
+      <span class="section-tag">ДОСЛІДЖЕННЯ</span>
+      <h2 class="section-title">Інтерактивна 3D-карта Вінниці</h2>
+    </div>
+    <div class="map-wrap">
+      <canvas id="map-canvas"></canvas>
+      <div class="map-legend">
+        <div style="font-family:'Unbounded',sans-serif;font-size:0.7rem;color:var(--text-muted);letter-spacing:0.1em;margin-bottom:0.5rem;">КЛЮЧОВІ ОБ'ЄКТИ</div>
+        <div class="map-pin active" onclick="selectPin(0)" id="pin-0">
+          <div class="pin-icon">🏛️</div>
+          <div>
+            <div class="pin-name">Вежа Артинова</div>
+            <div class="pin-desc">Символ міста на Європейській площі. Висота 72 м.</div>
+            <div class="pin-coins">🪙 +50 койнів</div>
+          </div>
+        </div>
+        <div class="map-pin" onclick="selectPin(1)" id="pin-1">
+          <div class="pin-icon">🏡</div>
+          <div>
+            <div class="pin-name">Садиба Пирогова</div>
+            <div class="pin-desc">Музей-садиба видатного хірурга М.І. Пирогова.</div>
+            <div class="pin-coins">🪙 +75 койнів</div>
+          </div>
+        </div>
+        <div class="map-pin" onclick="selectPin(2)" id="pin-2">
+          <div class="pin-icon">⛲</div>
+          <div>
+            <div class="pin-name">Фонтан Roshen</div>
+            <div class="pin-desc">Плавучий фонтан на р. Південний Буг — один з найбільших у Європі.</div>
+            <div class="pin-coins">🪙 +40 койнів</div>
+          </div>
+        </div>
+        <div class="map-pin" onclick="selectPin(3)" id="pin-3">
+          <div class="pin-icon">🦁</div>
+          <div>
+            <div class="pin-name">Подільський Зоопарк</div>
+            <div class="pin-desc">Сучасний зоопарк з понад 200 видами тварин.</div>
+            <div class="pin-coins">🪙 +35 койнів</div>
+          </div>
+        </div>
+        <div class="map-pin" onclick="selectPin(4)" id="pin-4">
+          <div class="pin-icon">🌟</div>
+          <div>
+            <div class="pin-name">Планетарій</div>
+            <div class="pin-desc">Дитячий планетарій на вул. Хлібна. Показ зірок та космічні шоу.</div>
+            <div class="pin-coins">🪙 +30 койнів</div>
+          </div>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <button class="btn-quest" onclick="showToast('🗺️ Маршрут побудовано!','Оптимальний маршрут до 5 локацій — 4.2 км, ~55 хв пішки')">Побудувати маршрут</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ========== QUESTS PAGE ========== -->
+<div id="page-quests" class="page">
+  <section class="section">
+    <div class="section-header">
+      <span class="section-tag">ГЕЙМІФІКАЦІЯ</span>
+      <h2 class="section-title">Активні квести</h2>
+    </div>
+    <div class="quests-grid">
+      <div class="quest-card">
+        <div class="quest-difficulty diff-easy">ЛЕГКИЙ</div>
+        <div class="quest-name">Серце Вінниці</div>
+        <div class="quest-desc">Відвідай 5 місць у центрі міста та зроби фото біля кожного. Ідеально для першого знайомства з містом.</div>
+        <div class="quest-meta">
+          <div style="font-size:0.75rem;color:var(--text-muted);">📍 5 локацій · ⏱ ~2 год</div>
+          <div class="quest-reward">🪙 200</div>
+        </div>
+        <div class="quest-progress-wrap">
+          <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:60%"></div></div>
+          <div class="quest-progress-label">3 з 5 виконано</div>
+        </div>
+        <button class="btn-quest" onclick="showToast('✅ Квест активний','Скануй QR-коди на локаціях для прогресу')">Продовжити</button>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-difficulty diff-med">СЕРЕДНІЙ</div>
+        <div class="quest-name">Спадщина Пирогова</div>
+        <div class="quest-desc">Дізнайся про життя великого вченого. Пройди маршрут від Садиби до Медичного університету.</div>
+        <div class="quest-meta">
+          <div style="font-size:0.75rem;color:var(--text-muted);">📍 8 локацій · ⏱ ~3 год</div>
+          <div class="quest-reward">🪙 400</div>
+        </div>
+        <div class="quest-progress-wrap">
+          <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:25%"></div></div>
+          <div class="quest-progress-label">2 з 8 виконано</div>
+        </div>
+        <button class="btn-quest" onclick="showToast('🏛️ Квест «Спадщина Пирогова»','Наступна зупинка: Садиба Пирогова, вул. Пирогова 155')">Навігація</button>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-difficulty diff-hard">МАРАФОН</div>
+        <div class="quest-name">Великий Вінницький забіг</div>
+        <div class="quest-desc">Пробіжи 10 км маршрутом через 12 знакових місць міста. Ідеально для любителів бігу!</div>
+        <div class="quest-meta">
+          <div style="font-size:0.75rem;color:var(--text-muted);">🏃 10 км · ⏱ ~60 хв</div>
+          <div class="quest-reward">🪙 1000</div>
+        </div>
+        <div class="quest-progress-wrap">
+          <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:0%"></div></div>
+          <div class="quest-progress-label">Не розпочато</div>
+        </div>
+        <button class="btn-quest" onclick="showToast('🏃 Марафон!','Стартова точка: набережна Roshen. Удачі! 🎯')">Почати забіг</button>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-difficulty diff-easy">ФОТО-КВЕСТ</div>
+        <div class="quest-name">Інстаграмні місця</div>
+        <div class="quest-desc">Знайди та сфотографуй 6 найкрасивіших куточків Вінниці. AI-бот оцінить кожне фото.</div>
+        <div class="quest-meta">
+          <div style="font-size:0.75rem;color:var(--text-muted);">📸 6 фото · ⏱ вільний час</div>
+          <div class="quest-reward">🪙 300</div>
+        </div>
+        <div class="quest-progress-wrap">
+          <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:50%"></div></div>
+          <div class="quest-progress-label">3 з 6 фото</div>
+        </div>
+        <button class="btn-quest" onclick="showPage('chat')">Відправити фото боту</button>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-difficulty diff-med">СІМЕЙНИЙ</div>
+        <div class="quest-name">Пригоди з дітьми</div>
+        <div class="quest-desc">Зоопарк, планетарій, парк культури. Ідеальний маршрут для сім'ї з дітьми на цілий день.</div>
+        <div class="quest-meta">
+          <div style="font-size:0.75rem;color:var(--text-muted);">👨‍👩‍👧 3 локації · ⏱ ~5 год</div>
+          <div class="quest-reward">🪙 500</div>
+        </div>
+        <div class="quest-progress-wrap">
+          <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:0%"></div></div>
+          <div class="quest-progress-label">Не розпочато</div>
+        </div>
+        <button class="btn-quest" onclick="showToast('👨‍👩‍👧 Сімейний квест','Перша зупинка: Подільський зоопарк, вул. Зулінського 9')">Розпочати</button>
+      </div>
+
+      <div class="quest-card">
+        <div class="quest-difficulty diff-hard">НІЧНИЙ</div>
+        <div class="quest-name">Нічна Вінниця</div>
+        <div class="quest-desc">Відвідай 7 місць після заходу сонця. Фонтан Roshen вночі — незабутнє видовище!</div>
+        <div class="quest-meta">
+          <div style="font-size:0.75rem;color:var(--text-muted);">🌙 7 локацій · ⏱ ~4 год</div>
+          <div class="quest-reward">🪙 750</div>
+        </div>
+        <div class="quest-progress-wrap">
+          <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:0%"></div></div>
+          <div class="quest-progress-label">Доступно після 20:00</div>
+        </div>
+        <button class="btn-quest" onclick="showToast('🌙 Нічний квест','Доступний щодня з 20:00 до 24:00. До старту залишилось 3 год.')">Нагадати</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ========== DASHBOARD PAGE ========== -->
+<div id="page-dashboard" class="page">
+  <section class="section">
+    <div class="section-header">
+      <span class="section-tag">ОСОБИСТИЙ КАБІНЕТ</span>
+      <h2 class="section-title">Дашборд туриста</h2>
+    </div>
+
+    <div class="coins-total">
+      <div class="coins-icon">🪙</div>
+      <div>
+        <div class="coins-amount">1,250</div>
+        <div class="coins-sublabel">Вінницьких Койнів на балансі</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;">Рівень</div>
+        <div style="font-family:'Unbounded',sans-serif;font-size:1.1rem;color:var(--gold);font-weight:700;">🌟 Дослідник</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">750 до рівня «Провідник»</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="stat-card">
+        <div class="stat-num">12</div>
+        <div class="stat-label">Відвіданих місць</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:25%"></div></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.4rem;">25% від усіх локацій</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">34.7</div>
+        <div class="stat-label">км пройдено</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:69%"></div></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.4rem;">Ціль: 50 км</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">2,890</div>
+        <div class="stat-label">ккал спалено</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:58%"></div></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.4rem;">Активних днів: 7</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.5rem;font-family:'Unbounded',sans-serif;font-size:0.75rem;color:var(--text-muted);letter-spacing:0.1em;">НЕЩОДАВНО ВІДВІДАНІ</div>
+    <div class="visited-grid">
+      <div class="visited-item">
+        <div class="visited-icon">🏛️</div>
+        <div>
+          <div class="visited-name">Вежа Артинова</div>
+          <div class="visited-date">Сьогодні, 14:30</div>
+          <div class="visited-coins">+50 🪙</div>
+        </div>
+      </div>
+      <div class="visited-item">
+        <div class="visited-icon">⛲</div>
+        <div>
+          <div class="visited-name">Фонтан Roshen</div>
+          <div class="visited-date">Вчора, 19:15</div>
+          <div class="visited-coins">+40 🪙</div>
+        </div>
+      </div>
+      <div class="visited-item">
+        <div class="visited-icon">🏡</div>
+        <div>
+          <div class="visited-name">Садиба Пирогова</div>
+          <div class="visited-date">2 дні тому</div>
+          <div class="visited-coins">+75 🪙</div>
+        </div>
+      </div>
+      <div class="visited-item">
+        <div class="visited-icon">🌟</div>
+        <div>
+          <div class="visited-name">Планетарій</div>
+          <div class="visited-date">5 днів тому</div>
+          <div class="visited-coins">+30 🪙</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1rem;">
+      <div class="stat-card">
+        <div style="font-family:'Unbounded',sans-serif;font-size:0.7rem;color:var(--gold);margin-bottom:1rem;">АКТИВНІ КВЕСТИ</div>
+        <div style="font-size:0.85rem;margin-bottom:0.5rem;">🏆 Серце Вінниці — 60%</div>
+        <div class="quest-progress-bar" style="margin-bottom:0.75rem;"><div class="quest-progress-fill" style="width:60%"></div></div>
+        <div style="font-size:0.85rem;margin-bottom:0.5rem;">📸 Інстаграмні місця — 50%</div>
+        <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:50%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div style="font-family:'Unbounded',sans-serif;font-size:0.7rem;color:var(--gold);margin-bottom:1rem;">ДОСЯГНЕННЯ</div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <div style="text-align:center;font-size:0.7rem;color:var(--text-muted)"><div style="font-size:2rem;">🦶</div>Перший крок</div>
+          <div style="text-align:center;font-size:0.7rem;color:var(--text-muted)"><div style="font-size:2rem;">🌅</div>Ранній птах</div>
+          <div style="text-align:center;font-size:0.7rem;color:var(--text-muted)"><div style="font-size:2rem;">📸</div>Фотограф</div>
+          <div style="text-align:center;font-size:0.7rem;color:var(--text-muted);opacity:0.4"><div style="font-size:2rem;">🏃</div>Марафонець</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ========== CHAT PAGE ========== -->
+<div id="page-chat" class="page">
+  <section class="section">
+    <div class="section-header">
+      <span class="section-tag">AI-АСИСТЕНТ</span>
+      <h2 class="section-title">«Вінні» — твій гід</h2>
+    </div>
+    <div class="chat-layout">
+      <div class="chat-sidebar">
+        <h3>МОЖЛИВОСТІ</h3>
+        <div class="chat-feature">
+          <div class="cf-icon">💬</div>
+          <div>
+            <div class="cf-name">Персональний діалог</div>
+            <div class="cf-desc">Відповідає на будь-які питання про місто природньою мовою</div>
+          </div>
+        </div>
+        <div class="chat-feature">
+          <div class="cf-icon">📅</div>
+          <div>
+            <div class="cf-name">Бронювання</div>
+            <div class="cf-desc">Столики в ресторанах, квитки в музеї + додає в Google Calendar</div>
+          </div>
+        </div>
+        <div class="chat-feature">
+          <div class="cf-icon">📸</div>
+          <div>
+            <div class="cf-name">AI-фотограф</div>
+            <div class="cf-desc">Накладає вінницькі фільтри та розповідає про місце 100 р. тому</div>
+          </div>
+        </div>
+        <div class="chat-feature">
+          <div class="cf-icon">🗺️</div>
+          <div>
+            <div class="cf-name">Маршрути</div>
+            <div class="cf-desc">Будує персональні маршрути з урахуванням твоїх потреб</div>
+          </div>
+        </div>
+        <div class="chat-feature">
+          <div class="cf-icon">🏃</div>
+          <div>
+            <div class="cf-name">Спортивні маршрути</div>
+            <div class="cf-desc">Пробіжки та пішохідні маршрути з підрахунком калорій</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-main">
+        <div class="chat-header">
+          <div class="chat-avatar">🤖</div>
+          <div>
+            <div class="chat-bot-name">Вінні — AI-гід Вінниці</div>
+            <div class="chat-status"><span class="chat-online"></span>Онлайн</div>
+          </div>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="msg bot">
+            <div class="msg-bubble">
+              Привіт! Я Вінні — твій персональний гід по Вінниці 👋<br><br>
+              Можу допомогти з маршрутами, бронюванням, розповісти про місто або обробити твої фото. Що цікавить?
+            </div>
+            <div class="msg-time">Зараз</div>
+            <div class="quick-replies">
+              <button class="qr" onclick="sendQuick('Що подивитися з дитиною?')">👶 З дитиною</button>
+              <button class="qr" onclick="sendQuick('Побудуй маршрут для пробіжки')">🏃 Пробіжка</button>
+              <button class="qr" onclick="sendQuick('Заброньуй столик у ресторані')">🍽️ Ресторан</button>
+              <button class="qr" onclick="sendQuick('Розкажи про Вежу Артинова')">🏛️ Вежа</button>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-wrap">
+          <input class="chat-input" id="chat-input" placeholder="Напиши щось..." onkeydown="if(event.key==='Enter')sendMsg()">
+          <button class="chat-send" onclick="sendMsg()">➤</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ========== SITES PAGE ========== -->
+<div id="page-sites" class="page">
+  <section class="section">
+    <div class="section-header">
+      <span class="section-tag">КОРИСНІ РЕСУРСИ</span>
+      <h2 class="section-title">Офіційні сайти про Вінницю</h2>
+    </div>
+    <div class="sites-grid">
+      <div class="site-card" onclick="openLink('https://vinnytsia.city/pobachyty/')">
+        <div class="site-thumb" style="background:linear-gradient(135deg,#1a2a4a,#0d1a2e)">
+          <div style="font-size:4rem;opacity:0.4">🏙️</div>
+          <div class="site-url-badge">vinnytsia.city</div>
+        </div>
+        <div class="site-body">
+          <div class="site-name">Офіційний туристичний сайт</div>
+          <div class="site-desc">Офіційний туристичний портал Вінниці: пам'ятки, події, зупинки, ресторани та екскурсії. Туристичні карти та гіди.</div>
+          <a class="site-link">Перейти →</a>
+        </div>
+      </div>
+      <div class="site-card" onclick="openLink('https://landmarks.in.ua/oblast/vinnytsya/vinnytsya-istoria')">
+        <div class="site-thumb" style="background:linear-gradient(135deg,#2a1a0d,#1a0d05)">
+          <div style="font-size:4rem;opacity:0.4">🏛️</div>
+          <div class="site-url-badge">landmarks.in.ua</div>
+        </div>
+        <div class="site-body">
+          <div class="site-name">Пам'ятки Вінниці</div>
+          <div class="site-desc">Каталог архітектурних та культурних пам'яток Вінниці. Детальні описи та фото кожного об'єкту.</div>
+          <a class="site-link">Перейти →</a>
+        </div>
+      </div>
+      <div class="site-card" onclick="openLink('https://vinnicya.vn.ua/')">
+        <div class="site-thumb" style="background:linear-gradient(135deg,#0d2a1a,#05140d)">
+          <div style="font-size:4rem;opacity:0.4">🌿</div>
+          <div class="site-url-badge">vinnicya.vn.ua</div>
+        </div>
+        <div class="site-body">
+          <div class="site-name">Вінниця — портал міста</div>
+          <div class="site-desc">Новини, події, корисна інформація для туристів та мешканців Вінниці. Все про місто в одному місці.</div>
+          <a class="site-link">Перейти →</a>
+        </div>
+      </div>
+      <div class="site-card" style="background:linear-gradient(135deg,var(--dark3),rgba(200,169,110,0.05));border-color:var(--border-bright);">
+        <div class="site-thumb" style="background:rgba(200,169,110,0.05)">
+          <div style="font-size:4rem;opacity:0.2">➕</div>
+          <div class="site-url-badge">your-site.ua</div>
+        </div>
+        <div class="site-body">
+          <div class="site-name">Додати ресурс</div>
+          <div class="site-desc">Знаєш корисний сайт або ресурс про Вінницю? Запропонуй його для додавання в каталог.</div>
+          <a class="site-link" onclick="showToast('📧 Форма надсилання','Відправте посилання на admin@vinnytsia-hub.ua')">Запропонувати →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- FOOTER -->
+<div id="main-footer">
+<footer class="footer">
+  <div class="footer-brand">
+    <div class="logo">VINNYTSIA HUB</div>
+    <div class="footer-desc">Туристична екосистема Вінниці. Відкривай місто по-новому: 3D-карта, квести, AI-асистент та «Вінницькі Койни».</div>
+  </div>
+  <div class="footer-col">
+    <h4>НАВІГАЦІЯ</h4>
+    <ul>
+      <li><a onclick="showPage('map')">Карта міста</a></li>
+      <li><a onclick="showPage('quests')">Квести</a></li>
+      <li><a onclick="showPage('dashboard')">Кабінет</a></li>
+      <li><a onclick="showPage('chat')">Чат-бот</a></li>
+    </ul>
+  </div>
+  <div class="footer-col">
+    <h4>РЕСУРСИ</h4>
+    <ul>
+      <li><a onclick="openLink('https://vinnytsia.city/')">Туристичний сайт</a></li>
+      <li><a onclick="openLink('https://landmarks.in.ua/oblast/vinnytsya/vinnytsya-istoria')">Пам'ятки</a></li>
+      <li><a onclick="openLink('https://vinnicya.vn.ua/')">Портал міста</a></li>
+    </ul>
+  </div>
+  <div class="footer-col">
+    <h4>КОНТАКТИ</h4>
+    <ul>
+      <li><a>info@vinnytsia-hub.ua</a></li>
+      <li><a>Telegram: @vinnytsia_hub</a></li>
+      <li><a>Instagram: @vinnytsia.hub</a></li>
+    </ul>
+  </div>
+</footer>
+<div class="footer-bottom">
+  <p>© 2025 Vinnytsia Hub. Всі права захищені.</p>
+  <p style="color:var(--gold);">🪙 Vinnytsia Coins — офіційна внутрішня валюта платформи</p>
+</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-title" id="toast-title"></div>
+  <div class="toast-body" id="toast-body"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ========== NAVIGATION ==========
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const navEl = document.getElementById('nav-' + id);
+  if(navEl) navEl.classList.add('active');
+  window.scrollTo(0,0);
+  if(id==='map') setTimeout(initMapCanvas, 100);
+}
+
+// ========== TOAST ==========
+let toastTimer;
+function showToast(title, body) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-title').textContent = title;
+  document.getElementById('toast-body').textContent = body;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ========== MODAL ==========
+function showModal(type) {
+  const overlay = document.getElementById('modal-overlay');
+  const content = document.getElementById('modal-content');
+  if(type === 'login') {
+    content.innerHTML = `
+      <div class="modal-title">Вхід до акаунту</div>
+      <div class="modal-sub">Продовж свою подорож Вінницею</div>
+      <div class="form-field"><label>Email</label><input type="email" placeholder="you@example.com"></div>
+      <div class="form-field"><label>Пароль</label><input type="password" placeholder="••••••••"></div>
+      <button class="btn-lg gold btn-full" onclick="loginUser()">Увійти</button>
+      <div class="modal-switch">Немає акаунту? <a onclick="showModal('register')">Зареєструватись</a></div>
+    `;
+  } else {
+    content.innerHTML = `
+      <div class="modal-title">Реєстрація</div>
+      <div class="modal-sub">Приєднуйся до спільноти мандрівників Вінниці</div>
+      <div class="form-field"><label>Ім'я</label><input type="text" placeholder="Твоє ім'я"></div>
+      <div class="form-field"><label>Email</label><input type="email" placeholder="you@example.com"></div>
+      <div class="form-field"><label>Пароль</label><input type="password" placeholder="Мін. 8 символів"></div>
+      <button class="btn-lg gold btn-full" onclick="registerUser()">Зареєструватись і отримати 100 🪙</button>
+      <div class="modal-switch">Вже є акаунт? <a onclick="showModal('login')">Увійти</a></div>
+    `;
+  }
+  overlay.classList.add('show');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+document.getElementById('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+
+function loginUser() { closeModal(); showToast('✅ Вхід успішний','Ласкаво просимо назад!'); }
+function registerUser() { closeModal(); showToast('🎉 Реєстрацію завершено!','Вітаємо! +100 🪙 Вінницьких Койнів нараховано на ваш рахунок'); }
+
+// ========== HERO THREE.JS ==========
+(function initHero() {
+  const canvas = document.getElementById('hero-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+  camera.position.set(0, 2, 8);
+
+  const goldColor = 0xC8A96E;
+  const light1 = new THREE.PointLight(goldColor, 2, 20);
+  light1.position.set(5, 5, 5);
+  scene.add(light1);
+  scene.add(new THREE.AmbientLight(0x333333, 1));
+
+  // City blocks
+  const blocks = [];
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, emissive: 0x111111, specular: goldColor, shininess: 80 });
+  const edgeMat = new THREE.LineBasicMaterial({ color: goldColor, transparent: true, opacity: 0.15 });
+
+  for(let i = 0; i < 30; i++) {
+    const h = 0.5 + Math.random() * 4;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6 + Math.random()*0.6, h, 0.6 + Math.random()*0.6), mat);
+    mesh.position.set((Math.random()-0.5)*20, h/2 - 2, (Math.random()-0.5)*20 - 5);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), edgeMat);
+    mesh.add(edges);
+    scene.add(mesh);
+    blocks.push(mesh);
+  }
+
+  // Grid plane
+  const gridHelper = new THREE.GridHelper(40, 40, goldColor, 0x222222);
+  gridHelper.position.y = -2;
+  scene.add(gridHelper);
+
+  // Particles
+  const pGeo = new THREE.BufferGeometry();
+  const pCount = 200;
+  const positions = new Float32Array(pCount * 3);
+  for(let i = 0; i < pCount; i++) {
+    positions[i*3] = (Math.random()-0.5)*30;
+    positions[i*3+1] = Math.random()*10 - 3;
+    positions[i*3+2] = (Math.random()-0.5)*30 - 5;
+  }
+  pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const pMat = new THREE.PointsMaterial({ color: goldColor, size: 0.06, transparent: true, opacity: 0.6 });
+  scene.add(new THREE.Points(pGeo, pMat));
+
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  let frame = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    frame++;
+    camera.position.x = Math.sin(frame * 0.003) * 3;
+    camera.position.y = 2 + Math.sin(frame * 0.002) * 0.5;
+    camera.lookAt(0, 0, -5);
+    light1.position.x = Math.sin(frame * 0.01) * 5;
+    light1.position.z = Math.cos(frame * 0.01) * 5;
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+
+// ========== MAP THREE.JS ==========
+let mapInitialized = false;
+function initMapCanvas() {
+  if(mapInitialized) return;
+  mapInitialized = true;
+
+  const canvas = document.getElementById('map-canvas');
+  if(!canvas) return;
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+  camera.position.set(0, 12, 8);
+  camera.lookAt(0, 0, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const dir = new THREE.DirectionalLight(0xC8A96E, 1.5);
+  dir.position.set(5, 10, 5);
+  scene.add(dir);
+
+  // Ground
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 20),
+    new THREE.MeshLambertMaterial({ color: 0x111111 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  // Grid
+  scene.add(new THREE.GridHelper(20, 20, 0x222222, 0x181818));
+
+  // River
+  const riverGeo = new THREE.PlaneGeometry(2, 18);
+  const riverMat = new THREE.MeshLambertMaterial({ color: 0x1a3a5a, transparent: true, opacity: 0.7 });
+  const river = new THREE.Mesh(riverGeo, riverMat);
+  river.rotation.x = -Math.PI / 2;
+  river.position.set(-3, 0.01, 0);
+  scene.add(river);
+
+  // Buildings
+  const landmarks = [
+    { x:0.5, z:-1, h:3.5, color:0xC8A96E, name:'Вежа' },
+    { x:2, z:1, h:2.5, color:0xA08050, name:'Садиба' },
+    { x:-1, z:2, h:1.5, color:0x8890C8, name:'Фонтан' },
+    { x:3, z:-2, h:2, color:0x68A878, name:'Зоопарк' },
+    { x:-2, z:-2, h:1.8, color:0xD878A8, name:'Планетарій' },
+  ];
+  const buildingMeshes = [];
+  landmarks.forEach((l, i) => {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.6, l.h, 0.6),
+      new THREE.MeshPhongMaterial({ color: l.color, emissive: new THREE.Color(l.color).multiplyScalar(0.2), specular: 0xffffff, shininess: 30 })
+    );
+    mesh.position.set(l.x, l.h/2, l.z);
+    scene.add(mesh);
+    buildingMeshes.push({ mesh, baseColor: l.color, name: l.name, idx: i });
+
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(mesh.geometry),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1 })
+    );
+    mesh.add(edges);
+  });
+
+  // Random smaller buildings
+  for(let i=0;i<50;i++){
+    const h = 0.3 + Math.random()*1.2;
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3+Math.random()*0.4, h, 0.3+Math.random()*0.4),
+      new THREE.MeshLambertMaterial({ color: 0x1c1c1c + Math.floor(Math.random()*0x0a0a0a) })
+    );
+    m.position.set((Math.random()-0.5)*16, h/2, (Math.random()-0.5)*16);
+    const distToRiver = Math.abs(m.position.x + 3);
+    if(distToRiver > 1.5) scene.add(m);
+  }
+
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  let isDragging = false, prevMouse = { x:0, y:0 };
+  let rotY = 0, rotX = 0.4;
+  canvas.addEventListener('mousedown', e => { isDragging = true; prevMouse = {x:e.clientX, y:e.clientY}; });
+  canvas.addEventListener('mouseup', () => isDragging = false);
+  canvas.addEventListener('mousemove', e => {
+    if(!isDragging) return;
+    rotY += (e.clientX - prevMouse.x) * 0.005;
+    rotX += (e.clientY - prevMouse.y) * 0.003;
+    rotX = Math.max(0.1, Math.min(1.2, rotX));
+    prevMouse = {x:e.clientX, y:e.clientY};
+  });
+
+  let frame = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    frame++;
+    const r = 18;
+    camera.position.x = Math.sin(rotY) * r * Math.cos(rotX);
+    camera.position.z = Math.cos(rotY) * r * Math.cos(rotX);
+    camera.position.y = r * Math.sin(rotX);
+    camera.lookAt(0, 0, 0);
+
+    // Pulse selected building
+    const selectedIdx = window.selectedPinIdx || 0;
+    buildingMeshes.forEach((b, i) => {
+      if(i === selectedIdx) {
+        const pulse = 1 + Math.sin(frame * 0.08) * 0.1;
+        b.mesh.scale.set(pulse, 1, pulse);
+        b.mesh.material.emissive = new THREE.Color(b.baseColor).multiplyScalar(0.4);
+      } else {
+        b.mesh.scale.set(1, 1, 1);
+        b.mesh.material.emissive = new THREE.Color(b.baseColor).multiplyScalar(0.1);
+      }
+    });
+
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+
+// Select pin
+window.selectedPinIdx = 0;
+function selectPin(idx) {
+  document.querySelectorAll('.map-pin').forEach((p,i) => {
+    p.classList.toggle('active', i === idx);
+  });
+  window.selectedPinIdx = idx;
+}
+
+// ========== CHATBOT ==========
+const botResponses = {
+  'дит': 'З дитиною — чудовий вибір! 👶\n\nРекомендую:\n• Подільський зоопарк (вул. Зулінського 9) — 200+ видів тварин\n• Планетарій на вул. Хлібна — шоу щогодини\n• Парк «Острів Кемпа» — Wi-Fi + дитячі майданчики\n\nМаршрут займе ~5 годин. Додати в Calendar?',
+  'пробіжк': 'Відмінно! 🏃 Ось 3 варіанти маршрутів для бігу:\n\n🟢 Легкий: набережна Roshen — 5 км (рівно, красиво)\n🟡 Середній: набережна → парк Ющенка → центр — 8 км\n🔴 Важкий: Великий Вінницький забіг — 10 км, 12 локацій\n\nЯкий обрати? За кожен забіг нараховую Вінницькі Койни 🪙',
+  'ресторан': 'Бронюю! 🍽️ Популярні ресторани Вінниці:\n\n• «Leopolys» — центр, від 300 грн/особу\n• «Чардаш» — угорська кухня, набережна\n• «Вірменська кухня» — авторські страви\n\nНа скільки осіб і на яку годину? Додам бронювання в Google Calendar.',
+  'вежа': '🏛️ Вежа Артинова — символ Вінниці!\n\nЗбудована у 1902 році як водонапірна вежа. Висота 42 м. Знаходиться на Європейській площі в самому серці міста.\n\nЦікавий факт: 100 років тому тут був центр торгівлі — Вінницький базар!\n\nСкануй QR-код біля вежі та отримай +50 🪙',
+  'фото': '📸 Відправ фото і я:\n\n1. Накладу фірмовий вінницький фільтр\n2. Розкажу що було на цьому місці 100 років тому\n3. Визначу локацію та додам у твої відвідані місця\n\nЧекаю на фото! 📷',
+  'default': 'Вінниця чекає тебе! 🌟\n\nМожу допомогти з:\n• Маршрути та пам\'ятки\n• Бронювання столиків та квитків\n• Квести та Вінницькі Койни\n• Обробка фото з вінницькими фільтрами\n\nЗапитай щось конкретне!'
+};
+
+function getBotResponse(msg) {
+  const m = msg.toLowerCase();
+  for(const key in botResponses) {
+    if(key !== 'default' && m.includes(key)) return botResponses[key];
+  }
+  return botResponses.default;
+}
+
+function sendMsg() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = '';
+  addMsg(msg, 'user');
+
+  // Typing indicator
+  const messagesEl = document.getElementById('chat-messages');
+  const typing = document.createElement('div');
+  typing.className = 'msg bot';
+  typing.innerHTML = '<div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  messagesEl.appendChild(typing);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  setTimeout(() => {
+    messagesEl.removeChild(typing);
+    const resp = getBotResponse(msg);
+    addMsg(resp, 'bot');
+  }, 1200 + Math.random() * 800);
+}
+
+function sendQuick(msg) {
+  document.getElementById('chat-input').value = msg;
+  sendMsg();
+}
+
+function addMsg(text, who) {
+  const messagesEl = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + who;
+  const now = new Date().toLocaleTimeString('uk', { hour:'2-digit', minute:'2-digit' });
+  div.innerHTML = `<div class="msg-bubble">${text.replace(/\n/g,'<br>')}</div><div class="msg-time">${now}</div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Init map on load if map page is visible
+document.addEventListener('DOMContentLoaded', () => {
+  const mapPage = document.getElementById('page-map');
+  if(mapPage && mapPage.classList.contains('active')) initMapCanvas();
+});
+</script>
+</body>
+</html>
