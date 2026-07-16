@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-Платформа "Моя Вінниця" — розширений інформаційний портал про місто Вінниця
-з чат-ботом-гідом, інтерактивною картою, обраним та планувальником маршруту.
+Платформа "Моя Вінниця" — інформаційний портал про місто Вінниця
+з чат-ботом-гідом, маршрутизатором, обраним та live-погодою на Streamlit.
 
 Запуск:
-    pip install -r requirements.txt
-    streamlit run app.py
+    pip install streamlit requests
+    streamlit run vinnytsia_app.py
 """
 
 import streamlit as st
-import pandas as pd
 import re
-from datetime import date, datetime
+from datetime import date
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 # =========================================================
 #                       НАЛАШТУВАННЯ СТОРІНКИ
@@ -22,6 +27,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+VINNYTSIA_LAT = 49.2331
+VINNYTSIA_LON = 28.4682
 
 # =========================================================
 #                       ДАНІ ПРО МІСТО
@@ -41,136 +49,141 @@ FACTS = [
     "Вінницькі мури — залишки укріплень колишнього єзуїтського монастиря XVII ст.",
     "Місто здобуло звання «Найкраще місто для життя в Україні» за кількома рейтингами.",
     "Вінницька Водонапірна вежа побудована у 1912 році і досі є символом міста.",
-    "Вінниця — один із лідерів України за рівнем розвитку велоінфраструктури.",
 ]
 
-# Кожна пам'ятка має координати (lat/lon) для карти та орієнтовний час відвідування
+# Кожна пам'ятка має орієнтовний час відвідування (у хвилинах) — потрібно для маршрутизатора
 LANDMARKS = [
     {
-        "name": "Фонтан Roshen", "category": "Розваги",
-        "desc": "Найбільший плавучий світломузичний фонтан у Європі на річці Південний Буг. "
-                "Шоу відбувається у теплу пору року у вечірній час.",
-        "address": "Набережна, біля Кемпи", "lat": 49.2327, "lon": 28.4707,
-        "visit_min": 45,
+        "name": "Фонтан Roshen",
+        "category": "Розваги",
+        "desc": "Найбільший плавучий світломузичний фонтан у Європі, розташований на річці Південний Буг. "
+                "Шоу відбувається у теплу пору року у вечірній час, поєднуючи воду, світло та музику.",
+        "address": "Набережна, біля Кемпа",
         "tags": ["фонтан", "roshen", "рошен", "шоу", "музика", "набережна"],
+        "duration": 45,
+        "img": "https://source.unsplash.com/400x260/?fountain,night",
     },
     {
-        "name": "Музей-садиба М.І. Пирогова «Вишня»", "category": "Музей",
+        "name": "Музей-садиба М.І. Пирогова «Вишня»",
+        "category": "Музей",
         "desc": "Меморіальний комплекс, де жив і працював видатний хірург Микола Пирогов. "
                 "У церкві-некрополі зберігається забальзамоване тіло вченого.",
-        "address": "вул. Пирогова, 155", "lat": 49.2160, "lon": 28.4084,
-        "visit_min": 60,
+        "address": "вул. Пирогова, 155",
         "tags": ["пирогов", "музей", "садиба", "вишня", "хірург"],
+        "duration": 60,
+        "img": "https://source.unsplash.com/400x260/?museum,manor",
     },
     {
-        "name": "Вінницькі мури (Мури)", "category": "Історія",
-        "desc": "Залишки укріплень єзуїтського монастиря XVII століття в історичному центрі.",
-        "address": "Старе місто, вул. Соборна", "lat": 49.2332, "lon": 28.4767,
-        "visit_min": 30,
+        "name": "Вінницькі мури (Мури)",
+        "category": "Історія",
+        "desc": "Залишки укріплень єзуїтського монастиря XVII століття, одна з найстаріших пам'яток міста, "
+                "розташована в історичному центрі.",
+        "address": "Старе місто, центр",
         "tags": ["мури", "фортеця", "історія", "центр", "єзуїти"],
+        "duration": 30,
+        "img": "https://source.unsplash.com/400x260/?old,wall,fortress",
     },
     {
-        "name": "Водонапірна вежа", "category": "Архітектура",
-        "desc": "Символ Вінниці, споруджена у 1912 році. Нині тут працює виставковий простір.",
-        "address": "пл. Європейська", "lat": 49.2346, "lon": 28.4828,
-        "visit_min": 30,
-        "tags": ["вежа", "водонапірна", "архітектура", "європейська"],
+        "name": "Водонапірна вежа",
+        "category": "Архітектура",
+        "desc": "Символ Вінниці, споруджена у 1912 році. Нині в приміщенні вежі працює виставковий простір.",
+        "address": "вул. Соборна",
+        "tags": ["вежа", "водонапірна", "архітектура", "соборна"],
+        "duration": 30,
+        "img": "https://source.unsplash.com/400x260/?water,tower",
     },
     {
-        "name": "Спасо-Преображенський кафедральний собор", "category": "Церква",
-        "desc": "Головний православний храм міста з багатою історією та красивим інтер'єром.",
-        "address": "вул. Соборна, 23", "lat": 49.2332, "lon": 28.4754,
-        "visit_min": 25,
+        "name": "Спасо-Преображенський кафедральний собор",
+        "category": "Церква",
+        "desc": "Головний православний храм міста, кафедральний собор з багатою історією та красивим інтер'єром.",
+        "address": "вул. Соборна, 23",
         "tags": ["церква", "собор", "храм", "релігія"],
+        "duration": 25,
+        "img": "https://source.unsplash.com/400x260/?cathedral,orthodox",
     },
     {
-        "name": "Костел Пресвятої Діви Марії Ангельської", "category": "Церква",
+        "name": "Костел Пресвятої Діви Марії Ангельської",
+        "category": "Церква",
         "desc": "Один з найстаріших католицьких храмів Вінниці, зразок бароккової архітектури.",
-        "address": "вул. Соборна, 12", "lat": 49.2331, "lon": 28.4753,
-        "visit_min": 25,
-        "tags": ["костел", "церква", "храм", "барокко", "капуцини"],
+        "address": "Старе місто",
+        "tags": ["костел", "церква", "храм", "барокко"],
+        "duration": 25,
+        "img": "https://source.unsplash.com/400x260/?church,baroque",
     },
     {
-        "name": "Парк Дружби народів (Центральний парк)", "category": "Парк",
-        "desc": "Найпопулярніший парк міста для прогулянок, відпочинку та сімейного дозвілля.",
-        "address": "вул. Хмельницьке шосе", "lat": 49.2280, "lon": 28.4560,
-        "visit_min": 60,
+        "name": "Парк Дружби народів (Центральний парк)",
+        "category": "Парк",
+        "desc": "Найпопулярніший парк міста для прогулянок, відпочинку та сімейного дозвілля, з алеями та атракціонами.",
+        "address": "вул. Хмельницьке шосе",
         "tags": ["парк", "прогулянка", "відпочинок", "діти", "дружби народів"],
+        "duration": 50,
+        "img": "https://source.unsplash.com/400x260/?park,alley",
     },
     {
-        "name": "Театральна площа", "category": "Центр",
-        "desc": "Центральна площа міста з театром ім. Садовського, місце проведення подій.",
-        "address": "Театральна площа", "lat": 49.2361, "lon": 28.4791,
-        "visit_min": 20,
+        "name": "Театральна площа",
+        "category": "Центр",
+        "desc": "Центральна площа міста з музичним драматичним театром ім. Садовського, місце проведення подій.",
+        "address": "Театральна площа",
         "tags": ["площа", "театр", "центр", "події"],
+        "duration": 20,
+        "img": "https://source.unsplash.com/400x260/?theatre,square",
     },
     {
-        "name": "Музей історії міста Вінниці", "category": "Музей",
+        "name": "Музей історії міста Вінниці",
+        "category": "Музей",
         "desc": "Експозиції з історії Вінниці від найдавніших часів до сьогодення.",
-        "address": "вул. Соборна", "lat": 49.2350, "lon": 28.4795,
-        "visit_min": 45,
+        "address": "вул. Соборна",
         "tags": ["музей", "історія", "експозиція"],
+        "duration": 50,
+        "img": "https://source.unsplash.com/400x260/?history,museum",
     },
     {
-        "name": "Синагога «Бейт Кнесет»", "category": "Релігія",
+        "name": "Синагога «Бейт Кнесет»",
+        "category": "Релігія",
         "desc": "Діюча синагога, що є свідченням багатої єврейської історії міста.",
-        "address": "центр міста", "lat": 49.2342, "lon": 28.4833,
-        "visit_min": 20,
+        "address": "центр міста",
         "tags": ["синагога", "релігія", "історія", "євреї"],
-    },
-    {
-        "name": "Пішохідний Кайдацький міст", "category": "Архітектура",
-        "desc": "Один із символічних мостів через Південний Буг з гарним видом на набережну.",
-        "address": "Набережна", "lat": 49.2325, "lon": 28.4700,
-        "visit_min": 20,
-        "tags": ["міст", "набережна", "прогулянка", "вид"],
-    },
-    {
-        "name": "Кемпа (острів)", "category": "Парк",
-        "desc": "Мальовничий острів на Південному Бузі, популярне місце для прогулянок та перегляду фонтану.",
-        "address": "Острів Кемпа", "lat": 49.2330, "lon": 28.4670,
-        "visit_min": 40,
-        "tags": ["кемпа", "острів", "набережна", "прогулянка"],
-    },
-    {
-        "name": "Літній театр", "category": "Центр",
-        "desc": "Історична локація для концертів і культурних подій просто неба в центрі міста.",
-        "address": "Центральний парк", "lat": 49.2286, "lon": 28.4570,
-        "visit_min": 25,
-        "tags": ["театр", "концерти", "події", "парк"],
-    },
-    {
-        "name": "Вінницький обласний краєзнавчий музей", "category": "Музей",
-        "desc": "Один із найстаріших музеїв області з колекціями з археології, природи та етнографії.",
-        "address": "вул. Соборна, 19", "lat": 49.2334, "lon": 28.4767,
-        "visit_min": 50,
-        "tags": ["музей", "краєзнавчий", "археологія", "етнографія"],
-    },
-    {
-        "name": "Парк Дружби народів: Алея закоханих", "category": "Парк",
-        "desc": "Романтична алея в парку — популярне місце для прогулянок та фотосесій.",
-        "address": "Парк Дружби народів", "lat": 49.2275, "lon": 28.4555,
-        "visit_min": 20,
-        "tags": ["алея", "парк", "прогулянка", "романтика"],
+        "duration": 20,
+        "img": "https://source.unsplash.com/400x260/?synagogue",
     },
 ]
 
 EVENTS = [
-    {"name": "VinnytsiaJazzFest", "date": "Червень",
-     "desc": "Міжнародний джазовий фестиваль просто неба за участю українських та закордонних музикантів.",
-     "place": "Центральний парк / набережна"},
-    {"name": "Vinnytsia Food Fest", "date": "Липень–Серпень",
-     "desc": "Фестиваль вуличної їжі з десятками локальних закладів і фудтраків.",
-     "place": "Театральна площа"},
-    {"name": "«Острів Європи»", "date": "Вересень",
-     "desc": "Мультикультурний фестиваль, присвячений європейським традиціям, музиці та кухні різних країн.",
-     "place": "Набережна / Кемпа"},
-    {"name": "День міста Вінниці", "date": "Вересень",
-     "desc": "Головне міське свято з концертами, ярмарками та феєрверком.",
-     "place": "Центр міста"},
-    {"name": "Різдвяний ярмарок", "date": "Грудень",
-     "desc": "Новорічно-різдвяний ярмарок з ковзанкою, гарячими напоями та сувенірами.",
-     "place": "Театральна площа"},
+    {
+        "name": "VinnytsiaJazzFest",
+        "date": "Червень",
+        "month": 6,
+        "desc": "Міжнародний джазовий фестиваль просто неба за участю українських та закордонних музикантів.",
+        "place": "Центральний парк / набережна",
+    },
+    {
+        "name": "Vinnytsia Food Fest",
+        "date": "Липень–Серпень",
+        "month": 7,
+        "desc": "Фестиваль вуличної їжі з десятками локальних закладів і фудтраків.",
+        "place": "Театральна площа",
+    },
+    {
+        "name": "«Острів Європи»",
+        "date": "Вересень",
+        "month": 9,
+        "desc": "Мультикультурний фестиваль, присвячений європейським традиціям, музиці та кухні різних країн.",
+        "place": "Набережна / Кемпа",
+    },
+    {
+        "name": "День міста Вінниці",
+        "date": "Вересень",
+        "month": 9,
+        "desc": "Головне міське свято з концертами, ярмарками та феєрверком.",
+        "place": "Центр міста",
+    },
+    {
+        "name": "Різдвяний ярмарок",
+        "date": "Грудень",
+        "month": 12,
+        "desc": "Новорічно-різдвяний ярмарок з ковзанкою, гарячими напоями та сувенірами.",
+        "place": "Театральна площа",
+    },
 ]
 
 RESTAURANTS = [
@@ -180,6 +193,13 @@ RESTAURANTS = [
     {"name": "Sushi-Ya", "type": "Японська", "rating": 4.6, "price": "$$"},
     {"name": "Кав'ярня «Львівська майстерня шоколаду»", "type": "Кав'ярня", "rating": 4.8, "price": "$"},
     {"name": "Steak House Bull", "type": "Стейки", "rating": 4.6, "price": "$$$"},
+]
+
+HOTELS = [
+    {"name": "Готель «南Buk»", "stars": 4, "price_night": "1400 грн"},
+    {"name": "Hotel Vinnytsia", "stars": 3, "price_night": "900 грн"},
+    {"name": "Апарт-готель «Кемпа Residence»", "stars": 4, "price_night": "1600 грн"},
+    {"name": "Хостел «Дружба»", "stars": 2, "price_night": "400 грн"},
 ]
 
 TRANSPORT_INFO = """
@@ -222,7 +242,7 @@ KNOWLEDGE_BASE = {
     "вежа": {
         "keywords": ["вежа", "водонапірна", "водонапирна"],
         "answer": "🗼 **Водонапірна вежа** — символ Вінниці, побудована у 1912 році. "
-                  "Сьогодні в її приміщенні працює виставковий простір. Адреса: пл. Європейська.",
+                  "Сьогодні в її приміщенні працює виставковий простір. Адреса: вул. Соборна.",
     },
     "мури": {
         "keywords": ["мури", "фортеця", "єзуїт"],
@@ -236,14 +256,18 @@ KNOWLEDGE_BASE = {
                   "всі вони мають багату історію та цікаву архітектуру.",
     },
     "парк": {
-        "keywords": ["парк", "прогулянка", "відпочинок", "дружби народів", "кемпа"],
-        "answer": "🌳 Найпопулярніший — **Парк Дружби народів (Центральний парк)** на Хмельницькому шосе, "
-                  "а також острів **Кемпа** — чудове місце для прогулянок і перегляду фонтану Roshen.",
+        "keywords": ["парк", "прогулянка", "відпочинок", "дружби народів"],
+        "answer": "🌳 Найпопулярніший — **Парк Дружби народів (Центральний парк)** на Хмельницькому шосе: "
+                  "алеї, атракціони та місця для сімейного відпочинку.",
     },
     "ресторан": {
         "keywords": ["ресторан", "їжа", "поїсти", "кафе", "де поїсти", "кухня"],
         "answer": "🍽️ Рекомендую переглянути розділ **«Ресторани»** — там є підбірка закладів з рейтингами: "
                   "від української кухні до суші та стейків.",
+    },
+    "готель": {
+        "keywords": ["готель", "хостел", "де зупинитись", "проживання", "ночівля"],
+        "answer": "🏨 У розділі **«Про місто» → Проживання** є варіанти готелів і хостелів різної цінової категорії.",
     },
     "транспорт": {
         "keywords": ["транспорт", "як дістатися", "поїзд", "автобус", "аеропорт", "тролейбус"],
@@ -260,20 +284,15 @@ KNOWLEDGE_BASE = {
         "answer": "🎉 У Вінниці щороку проходять: **VinnytsiaJazzFest** (червень), **Vinnytsia Food Fest** "
                   "(липень–серпень) та фестиваль **«Острів Європи»** (вересень). Деталі — на сторінці «Події».",
     },
-    "карта": {
-        "keywords": ["карта", "де знаходиться", "маршрут", "де на карті"],
-        "answer": "🗺️ Усі пам'ятки відмічені на сторінці **«Карта»** — там можна побачити їх розташування "
-                  "одразу, а на сторінці **«Маршрут»** — скласти власний план подорожі.",
-    },
-    "готель": {
-        "keywords": ["готель", "де зупинитися", "проживання", "хостел", "апартаменти"],
-        "answer": "🏨 У Вінниці є готелі різних категорій — від бюджетних хостелів у центрі до готелів "
-                  "рівня 4* біля набережної. Рекомендується бронювати заздалегідь у сезон фестивалів.",
-    },
     "погода": {
-        "keywords": ["погода", "клімат", "температура", "яка погода"],
-        "answer": "🌤️ Вінниця має помірно-континентальний клімат: тепле літо (+22...+28°C) та помірно "
-                  "холодну зиму (-3...-7°C). Найкращий час для відвідування — з травня по вересень.",
+        "keywords": ["погода", "температура", "прогноз"],
+        "answer": "🌤️ Актуальну погоду у Вінниці можна побачити на **Головній сторінці** — там підключений "
+                  "живий прогноз.",
+    },
+    "маршрут": {
+        "keywords": ["маршрут", "план", "екскурсія", "куди піти", "що відвідати за день"],
+        "answer": "🗺️ Скористайтеся сторінкою **«Маршрут»** — оберіть пам'ятки, і я складу для вас "
+                  "оптимальний порядок відвідування з орієнтовним часом.",
     },
 }
 
@@ -286,27 +305,25 @@ QUICK_QUESTIONS = [
     "Які події найближчим часом?",
     "Порадь ресторан",
     "Як дістатися до Вінниці?",
-    "Яка зараз погода?",
+    "Склади маршрут на день",
 ]
-
-
-def _contains_phrase(text: str, phrases: list) -> bool:
-    """Перевіряє наявність фрази як окремого слова/виразу (не всередині інших слів)."""
-    return any(re.search(rf"(?<!\w){re.escape(p)}(?!\w)", text) for p in phrases)
 
 
 def get_bot_response(user_text: str) -> str:
     """Проста rule-based логіка чат-бота на основі ключових слів."""
     text = user_text.lower().strip()
-    # Роздільники замінюємо на пробіл, щоб слова не "склеювались" (було: "привіт,як" -> "привітяк")
-    text_clean = re.sub(r"[^\w\s]", " ", text)
-    text_clean = re.sub(r"\s+", " ", text_clean)
+    text_clean = re.sub(r"[^\w\sа-яіїєґ]", "", text)
 
-    # 1) Спочатку шукаємо змістовну відповідь — щоб на "Привіт, розкажи про фонтан"
-    #    бот відповідав про фонтан, а не лише вітався
+    if any(g in text_clean for g in GREETINGS):
+        return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте мене про пам'ятки, ресторани, "
+                "події, готелі, погоду чи маршрут — і я підкажу!")
+
+    if any(t in text_clean for t in THANKS):
+        return "Будь ласка! 😊 Якщо ще щось цікавить — питайте."
+
     best_match = None
     best_score = 0
-    for data in KNOWLEDGE_BASE.values():
+    for topic, data in KNOWLEDGE_BASE.items():
         score = sum(1 for kw in data["keywords"] if kw in text_clean)
         if score > best_score:
             best_score = score
@@ -315,62 +332,83 @@ def get_bot_response(user_text: str) -> str:
     if best_match:
         return best_match
 
-    # 2) Якщо змістовного збігу немає — обробляємо привітання та подяки
-    if _contains_phrase(text_clean, GREETINGS):
-        return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте мене про пам'ятки, ресторани, "
-                "події, транспорт чи погоду — і я підкажу!")
-
-    if _contains_phrase(text_clean, THANKS):
-        return "Будь ласка! 😊 Якщо ще щось цікавить — питайте."
-
     return ("🤔 Вибачте, я поки не знаю відповіді на це питання. Спробуйте запитати про фонтан Roshen, "
-            "музей Пирогова, Вінницькі мури, церкви, парки, ресторани, транспорт, готелі, погоду, "
-            "історію, карту або події міста.")
+            "музей Пирогова, Вінницькі мури, церкви, парки, ресторани, готелі, транспорт, погоду, "
+            "історію, події чи маршрут по місту.")
 
 
 # =========================================================
-#                       ДОПОМІЖНІ ФУНКЦІЇ (СТАН)
+#                       ДОПОМІЖНІ ФУНКЦІЇ
 # =========================================================
 
-def init_session_state():
+def init_state():
     if "page" not in st.session_state:
         st.session_state.page = "Головна"
-    if "nav_radio" not in st.session_state:
-        st.session_state.nav_radio = st.session_state.page
-    if "favorites" not in st.session_state:
-        st.session_state.favorites = set()
+    if "fav_landmarks" not in st.session_state:
+        st.session_state.fav_landmarks = set()
+    if "fav_restaurants" not in st.session_state:
+        st.session_state.fav_restaurants = set()
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [
             {"role": "assistant", "content": "Вітаю! 👋 Я віртуальний гід по Вінниці. Чим можу допомогти?"}
         ]
-    if "feedback_list" not in st.session_state:
-        st.session_state.feedback_list = []
+    if "feedback_log" not in st.session_state:
+        st.session_state.feedback_log = []
 
 
-def toggle_favorite(name: str):
-    if name in st.session_state.favorites:
-        st.session_state.favorites.remove(name)
-    else:
-        st.session_state.favorites.add(name)
-
-
-def landmark_by_name(name: str):
-    for item in LANDMARKS:
-        if item["name"] == name:
-            return item
+@st.cache_data(ttl=1800, show_spinner=False)
+def fetch_weather():
+    """Отримує поточну погоду для Вінниці через безкоштовне Open-Meteo API (без ключа)."""
+    if not HAS_REQUESTS:
+        return None
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={VINNYTSIA_LAT}&longitude={VINNYTSIA_LON}"
+            "&current_weather=true"
+        )
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("current_weather")
+    except Exception:
+        return None
     return None
 
 
-def _sync_nav_from_page():
-    """Програмна зміна сторінки (кнопки швидкого доступу) → оновлюємо стан
-    радіо-перемикача ДО його створення, інакше він перезапише сторінку назад."""
-    if st.session_state.nav_radio != st.session_state.page:
-        st.session_state.nav_radio = st.session_state.page
+WEATHER_CODES = {
+    0: "☀️ Ясно", 1: "🌤️ Малохмарно", 2: "⛅ Хмарно", 3: "☁️ Похмуро",
+    45: "🌫️ Туман", 48: "🌫️ Паморозь",
+    51: "🌦️ Легка мряка", 61: "🌧️ Невеликий дощ", 63: "🌧️ Дощ", 65: "🌧️ Сильний дощ",
+    71: "🌨️ Невеликий сніг", 73: "🌨️ Сніг", 75: "❄️ Сильний сніг",
+    80: "🌦️ Зливи", 95: "⛈️ Гроза",
+}
 
 
-def _on_nav_change():
-    """Користувач обрав сторінку в сайдбарі → оновлюємо поточну сторінку."""
-    st.session_state.page = st.session_state.nav_radio
+def build_route(selected_names, start_time_str):
+    """Простий генератор маршруту: зберігає порядок вибору, рахує час відвідування + 15 хв на переїзд."""
+    from datetime import datetime, timedelta
+    try:
+        h, m = map(int, start_time_str.split(":"))
+        current = datetime(2000, 1, 1, h, m)
+    except Exception:
+        current = datetime(2000, 1, 1, 9, 0)
+
+    route = []
+    name_to_item = {i["name"]: i for i in LANDMARKS}
+    for name in selected_names:
+        item = name_to_item[name]
+        start = current
+        end = start + timedelta(minutes=item["duration"])
+        route.append({
+            "name": name,
+            "start": start.strftime("%H:%M"),
+            "end": end.strftime("%H:%M"),
+            "duration": item["duration"],
+            "address": item["address"],
+        })
+        current = end + timedelta(minutes=15)  # +15 хв на переїзд/перехід
+    return route, current.strftime("%H:%M")
 
 
 # =========================================================
@@ -415,6 +453,19 @@ def page_home():
         unsafe_allow_html=True,
     )
 
+    weather = fetch_weather()
+    if weather:
+        code = weather.get("weathercode", 0)
+        desc = WEATHER_CODES.get(code, "🌡️")
+        st.info(
+            f"**Погода у Вінниці зараз:** {desc} · {weather.get('temperature')}°C · "
+            f"вітер {weather.get('windspeed')} км/год"
+        )
+    elif HAS_REQUESTS:
+        st.caption("⚠️ Не вдалося отримати погоду (немає з'єднання з інтернетом).")
+    else:
+        st.caption("ℹ️ Встановіть бібліотеку `requests`, щоб бачити live-погоду: `pip install requests`.")
+
     st.subheader("📊 Місто у цифрах")
     cols = st.columns(len(CITY_STATS))
     for col, (label, value) in zip(cols, CITY_STATS.items()):
@@ -426,33 +477,47 @@ def page_home():
 
     st.markdown("---")
     st.subheader("⚡ Швидкий доступ")
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    # (колонка, підпис кнопки, цільова сторінка) — ціль вказана явно,
-    # без крихкого розбирання рядка з емодзі
-    quick_nav = [
-        (c1, "🗺️ Пам'ятки", "Пам'ятки"), (c2, "🎉 Події", "Події"),
-        (c3, "🍽️ Ресторани", "Ресторани"), (c4, "🤖 Чат-бот", "Чат-бот"),
-        (c5, "🧭 Карта", "Карта"), (c6, "📝 Маршрут", "Маршрут"),
-    ]
-    for col, label, target_page in quick_nav:
-        if col.button(label, use_container_width=True):
-            st.session_state.page = target_page
-            st.rerun()
+    c1, c2, c3, c4, c5 = st.columns(5)
+    if c1.button("🗺️ Пам'ятки", use_container_width=True):
+        st.session_state.page = "Пам'ятки"; st.rerun()
+    if c2.button("🎉 Події", use_container_width=True):
+        st.session_state.page = "Події"; st.rerun()
+    if c3.button("🍽️ Ресторани", use_container_width=True):
+        st.session_state.page = "Ресторани"; st.rerun()
+    if c4.button("🧭 Маршрут", use_container_width=True):
+        st.session_state.page = "Маршрут"; st.rerun()
+    if c5.button("🤖 Чат-бот", use_container_width=True):
+        st.session_state.page = "Чат-бот"; st.rerun()
 
     st.markdown("---")
-    left, right = st.columns([2, 1])
-    with left:
-        st.subheader("💡 Цікаві факти")
-        for fact in FACTS:
-            st.markdown(f"- {fact}")
-    with right:
-        st.subheader("📈 Популярність пам'яток")
-        st.caption("Умовна статистика відвідувань за 2025 рік (демо-дані)")
-        demo_df = pd.DataFrame({
-            "Пам'ятка": ["Фонтан Roshen", "Музей Пирогова", "Мури", "Парк Дружби", "Водонапірна вежа"],
-            "Відвідувачі (тис.)": [420, 180, 95, 260, 70],
-        }).set_index("Пам'ятка")
-        st.bar_chart(demo_df)
+    st.subheader("💡 Цікаві факти")
+    for fact in FACTS:
+        st.markdown(f"- {fact}")
+
+    st.markdown("---")
+    st.subheader("🔎 Загальний пошук по платформі")
+    query = st.text_input("Введіть назву пам'ятки, події чи ресторану", key="global_search")
+    if query:
+        q = query.lower()
+        found_landmarks = [i for i in LANDMARKS if q in i["name"].lower() or q in i["desc"].lower()]
+        found_events = [e for e in EVENTS if q in e["name"].lower() or q in e["desc"].lower()]
+        found_rest = [r for r in RESTAURANTS if q in r["name"].lower() or q in r["type"].lower()]
+
+        if not (found_landmarks or found_events or found_rest):
+            st.warning("Нічого не знайдено 🤷")
+        else:
+            if found_landmarks:
+                st.markdown("**Пам'ятки:**")
+                for i in found_landmarks:
+                    st.write(f"📍 {i['name']} — {i['category']}")
+            if found_events:
+                st.markdown("**Події:**")
+                for e in found_events:
+                    st.write(f"🎉 {e['name']} — {e['date']}")
+            if found_rest:
+                st.markdown("**Ресторани:**")
+                for r in found_rest:
+                    st.write(f"🍽️ {r['name']} — {r['type']}, ⭐{r['rating']}")
 
 
 def page_landmarks():
@@ -474,39 +539,22 @@ def page_landmarks():
 
     st.write(f"Знайдено: **{len(filtered)}** з {len(LANDMARKS)}")
 
-    for item in filtered:
-        is_fav = item["name"] in st.session_state.favorites
-        with st.expander(f"{'⭐' if is_fav else '📍'} {item['name']}  —  _{item['category']}_"):
-            st.write(item["desc"])
-            st.caption(f"Адреса: {item['address']} · Орієнтовний час відвідування: {item['visit_min']} хв")
-            fav_label = "💔 Прибрати з обраного" if is_fav else "❤️ Додати в обране"
-            if st.button(fav_label, key=f"fav_{item['name']}"):
-                toggle_favorite(item["name"])
-                st.rerun()
-
-
-def page_map():
-    st.header("🧭 Інтерактивна карта пам'яток")
-    st.caption("Позначки показують розташування основних пам'яток Вінниці")
-
-    categories = ["Усі"] + sorted(set(item["category"] for item in LANDMARKS))
-    selected_cat = st.selectbox("Фільтр за категорією", categories, key="map_cat")
-
-    filtered = LANDMARKS if selected_cat == "Усі" else [i for i in LANDMARKS if i["category"] == selected_cat]
-
-    if filtered:
-        map_df = pd.DataFrame({
-            "lat": [i["lat"] for i in filtered],
-            "lon": [i["lon"] for i in filtered],
-        })
-        st.map(map_df, zoom=13)
-    else:
-        st.info("Немає пам'яток у цій категорії.")
-
-    st.markdown("---")
-    st.subheader("Список позначок на карті")
-    for item in filtered:
-        st.markdown(f"- **{item['name']}** ({item['category']}) — {item['address']}")
+    cols = st.columns(2)
+    for idx, item in enumerate(filtered):
+        with cols[idx % 2]:
+            with st.container(border=True):
+                st.image(item["img"], use_container_width=True)
+                st.subheader(item["name"])
+                st.caption(f"{item['category']} · ⏱ ~{item['duration']} хв · 📍 {item['address']}")
+                st.write(item["desc"])
+                is_fav = item["name"] in st.session_state.fav_landmarks
+                label = "💔 Прибрати з обраного" if is_fav else "❤️ Додати в обране"
+                if st.button(label, key=f"fav_{item['name']}"):
+                    if is_fav:
+                        st.session_state.fav_landmarks.discard(item["name"])
+                    else:
+                        st.session_state.fav_landmarks.add(item["name"])
+                    st.rerun()
 
 
 def page_events():
@@ -514,7 +562,19 @@ def page_events():
     today = date.today()
     st.caption(f"Сьогодні: {today.strftime('%d.%m.%Y')}")
 
-    for ev in EVENTS:
+    month_filter = st.selectbox(
+        "Фільтр за місяцем",
+        ["Усі"] + [f"{m:02d}" for m in range(1, 13)],
+    )
+
+    events_to_show = EVENTS
+    if month_filter != "Усі":
+        events_to_show = [e for e in EVENTS if e["month"] == int(month_filter)]
+
+    if not events_to_show:
+        st.info("У цьому місяці запланованих подій немає.")
+
+    for ev in events_to_show:
         with st.container(border=True):
             c1, c2 = st.columns([3, 1])
             with c1:
@@ -527,9 +587,13 @@ def page_events():
 
 def page_restaurants():
     st.header("🍽️ Ресторани Вінниці")
-    sort_option = st.radio("Сортувати за:", ["Рейтингом", "Назвою"], horizontal=True)
+    c1, c2 = st.columns(2)
+    sort_option = c1.radio("Сортувати за:", ["Рейтингом", "Назвою"], horizontal=True)
+    price_filter = c2.selectbox("Цінова категорія", ["Усі", "$", "$$", "$$$"])
 
     data = RESTAURANTS.copy()
+    if price_filter != "Усі":
+        data = [r for r in data if r["price"] == price_filter]
     if sort_option == "Рейтингом":
         data.sort(key=lambda x: x["rating"], reverse=True)
     else:
@@ -538,127 +602,105 @@ def page_restaurants():
     for r in data:
         stars = "⭐" * int(round(r["rating"]))
         with st.container(border=True):
-            c1, c2, c3 = st.columns([2, 1, 1])
+            c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
             c1.markdown(f"**{r['name']}**  \n_{r['type']}_")
             c2.write(f"{stars} {r['rating']}")
             c3.write(f"Цінник: {r['price']}")
+            is_fav = r["name"] in st.session_state.fav_restaurants
+            label = "💔" if is_fav else "❤️"
+            if c4.button(label, key=f"fav_r_{r['name']}"):
+                if is_fav:
+                    st.session_state.fav_restaurants.discard(r["name"])
+                else:
+                    st.session_state.fav_restaurants.add(r["name"])
+                st.rerun()
+
+
+def page_route():
+    st.header("🧭 Побудова маршруту на день")
+    st.write("Оберіть пам'ятки, які хочете відвідати, вкажіть час старту — і отримайте орієнтовний план дня.")
+
+    names = [i["name"] for i in LANDMARKS]
+    selected = st.multiselect("Пам'ятки для відвідування", names, default=names[:3])
+    start_time = st.time_input("Час початку екскурсії", value=None)
+    start_str = start_time.strftime("%H:%M") if start_time else "09:00"
+
+    if st.button("🧮 Скласти маршрут", type="primary"):
+        if not selected:
+            st.warning("Оберіть хоча б одну пам'ятку.")
+        else:
+            route, finish = build_route(selected, start_str)
+            st.success(f"Маршрут складено! Орієнтовний час завершення: **{finish}**")
+            for i, stop in enumerate(route, start=1):
+                st.markdown(
+                    f"**{i}. {stop['name']}** — {stop['start']}–{stop['end']} "
+                    f"(⏱ {stop['duration']} хв) · 📍 {stop['address']}"
+                )
+                if i < len(route):
+                    st.caption("🚶 ~15 хв на переїзд/перехід до наступної точки")
 
 
 def page_favorites():
-    st.header("⭐ Обране")
-    if not st.session_state.favorites:
-        st.info("Ви ще не додали жодної пам'ятки в обране. Перейдіть на сторінку «Пам'ятки», "
-                 "щоб додати цікаві місця сюди.")
-        if st.button("🗺️ Перейти до пам'яток"):
-            st.session_state.page = "Пам'ятки"
-            st.rerun()
+    st.header("❤️ Обране")
+    if not st.session_state.fav_landmarks and not st.session_state.fav_restaurants:
+        st.info("Ви ще нічого не додали в обране. Натисніть ❤️ на сторінках «Пам'ятки» або «Ресторани».")
         return
 
-    st.write(f"У вас **{len(st.session_state.favorites)}** обраних пам'яток:")
-    for name in sorted(st.session_state.favorites):
-        item = landmark_by_name(name)
-        if not item:
-            continue
-        with st.container(border=True):
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                st.markdown(f"**{item['name']}** — _{item['category']}_")
-                st.caption(item["desc"])
-            with c2:
-                if st.button("💔 Прибрати", key=f"remove_fav_{name}"):
-                    toggle_favorite(name)
-                    st.rerun()
+    if st.session_state.fav_landmarks:
+        st.subheader("🗺️ Пам'ятки")
+        name_to_item = {i["name"]: i for i in LANDMARKS}
+        for name in st.session_state.fav_landmarks:
+            item = name_to_item[name]
+            st.markdown(f"**{item['name']}** — {item['category']} · 📍 {item['address']}")
 
-
-def page_route_planner():
-    st.header("📝 Планувальник маршруту")
-    st.caption("Оберіть пам'ятки, які хочете відвідати, і отримайте орієнтовний план дня")
-
-    names = [i["name"] for i in LANDMARKS]
-    default_selection = list(st.session_state.favorites) if st.session_state.favorites else []
-    selected = st.multiselect("Оберіть пам'ятки для маршруту", names, default=default_selection)
-
-    start_time = st.time_input("Час початку прогулянки", value=datetime.strptime("10:00", "%H:%M").time())
-    travel_between = st.slider("Орієнтовний час переміщення між локаціями (хв)", 5, 40, 15)
-
-    if not selected:
-        st.info("Оберіть хоча б одну пам'ятку, щоб побудувати маршрут.")
-        return
-
-    items = [landmark_by_name(n) for n in selected]
-    total_visit = sum(i["visit_min"] for i in items)
-    total_travel = travel_between * max(0, len(items) - 1)
-    total_minutes = total_visit + total_travel
-
-    current_dt = datetime.combine(date.today(), start_time)
-    st.subheader("🗓️ Ваш план на день")
-    for idx, item in enumerate(items, start=1):
-        end_dt = current_dt + pd.Timedelta(minutes=item["visit_min"])
-        st.markdown(
-            f"**{idx}. {item['name']}** — {current_dt.strftime('%H:%M')}–{end_dt.strftime('%H:%M')} "
-            f"({item['visit_min']} хв) · {item['address']}"
-        )
-        current_dt = end_dt + pd.Timedelta(minutes=travel_between)
-
-    st.markdown("---")
-    h, m = divmod(total_minutes, 60)
-    st.success(f"⏱️ Загальний час маршруту: **{h} год {m} хв** "
-               f"(відвідування: {total_visit} хв, переміщення: {total_travel} хв)")
-
-    itinerary_text = "\n".join(
-        f"{idx}. {i['name']} — {i['address']} (~{i['visit_min']} хв)"
-        for idx, i in enumerate(items, start=1)
-    )
-    st.download_button(
-        "⬇️ Завантажити маршрут як текстовий файл",
-        data=f"Маршрут по Вінниці\nПочаток: {start_time.strftime('%H:%M')}\n\n{itinerary_text}",
-        file_name="vinnytsia_route.txt",
-        mime="text/plain",
-    )
+    if st.session_state.fav_restaurants:
+        st.subheader("🍽️ Ресторани")
+        name_to_r = {r["name"]: r for r in RESTAURANTS}
+        for name in st.session_state.fav_restaurants:
+            r = name_to_r[name]
+            st.markdown(f"**{r['name']}** — {r['type']} · ⭐{r['rating']}")
 
 
 def page_about():
     st.header("ℹ️ Про місто")
-    tab1, tab2 = st.tabs(["🚌 Транспорт і як дістатись", "🏆 Досягнення"])
+    tab1, tab2, tab3 = st.tabs(["🚌 Транспорт і як дістатись", "🏆 Досягнення", "🏨 Проживання"])
     with tab1:
         st.markdown(TRANSPORT_INFO)
     with tab2:
         st.markdown(ACHIEVEMENTS)
+    with tab3:
+        for h in HOTELS:
+            st.markdown(f"**{h['name']}** — {'⭐' * h['stars']} · {h['price_night']}/ніч")
 
 
 def page_feedback():
-    st.header("📮 Зворотній зв'язок")
-    st.caption("Поділіться враженнями від платформи або запропонуйте нову пам'ятку чи заклад")
-
+    st.header("📝 Зворотний зв'язок")
+    st.write("Поділіться враженнями від платформи або запропонуйте нову пам'ятку чи подію.")
     with st.form("feedback_form", clear_on_submit=True):
-        name = st.text_input("Ваше ім'я")
-        email = st.text_input("Email (необов'язково)")
-        category = st.selectbox("Тема звернення", ["Пропозиція", "Помилка на сайті", "Подяка", "Інше"])
+        name = st.text_input("Ваше ім'я (необов'язково)")
+        rating = st.slider("Оцінка платформи", 1, 5, 5)
         message = st.text_area("Повідомлення")
-        submitted = st.form_submit_button("📤 Надіслати")
-
+        submitted = st.form_submit_button("Надіслати")
         if submitted:
-            if not name or not message:
-                st.warning("Будь ласка, заповніть ім'я та повідомлення.")
+            if message.strip():
+                st.session_state.feedback_log.append(
+                    {"name": name or "Анонім", "rating": rating, "message": message}
+                )
+                st.success("Дякуємо за відгук! 🙌")
             else:
-                st.session_state.feedback_list.append({
-                    "name": name, "email": email, "category": category,
-                    "message": message, "date": datetime.now().strftime("%d.%m.%Y %H:%M"),
-                })
-                st.success("Дякуємо за ваш відгук! 🙌")
+                st.warning("Будь ласка, напишіть повідомлення перед відправкою.")
 
-    if st.session_state.feedback_list:
+    if st.session_state.feedback_log:
         st.markdown("---")
-        st.subheader("Останні відгуки (демо, зберігаються лише в поточній сесії)")
-        for fb in reversed(st.session_state.feedback_list[-5:]):
-            with st.container(border=True):
-                st.markdown(f"**{fb['name']}** · _{fb['category']}_ · {fb['date']}")
-                st.write(fb["message"])
+        st.subheader("Останні відгуки")
+        for fb in reversed(st.session_state.feedback_log[-5:]):
+            st.markdown(f"**{fb['name']}** — {'⭐' * fb['rating']}")
+            st.caption(fb["message"])
 
 
 def page_chatbot():
     st.header("🤖 Чат-бот — віртуальний гід по Вінниці")
-    st.caption("Запитайте про пам'ятки, ресторани, події, транспорт, погоду чи історію міста.")
+    st.caption("Запитайте про пам'ятки, ресторани, готелі, події, транспорт, погоду чи маршрут по місту.")
 
     st.write("**Швидкі запитання:**")
     cols = st.columns(3)
@@ -692,35 +734,31 @@ def page_chatbot():
 # =========================================================
 
 def main():
-    init_session_state()
+    init_state()
     render_header()
 
     pages = {
         "Головна": page_home,
         "Пам'ятки": page_landmarks,
-        "Карта": page_map,
         "Події": page_events,
         "Ресторани": page_restaurants,
+        "Маршрут": page_route,
         "Обране": page_favorites,
-        "Маршрут": page_route_planner,
         "Чат-бот": page_chatbot,
         "Про місто": page_about,
-        "Зворотній зв'язок": page_feedback,
+        "Зворотний зв'язок": page_feedback,
     }
 
     with st.sidebar:
         st.markdown("## 🏙️ Моя Вінниця")
-        # Синхронізація в обидва боки:
-        #  - page → nav_radio: перед створенням віджета (кнопки швидкого доступу);
-        #  - nav_radio → page: через on_change (вибір користувача в сайдбарі).
-        _sync_nav_from_page()
-        st.radio("Навігація", list(pages.keys()), key="nav_radio", on_change=_on_nav_change)
+        choice = st.radio("Навігація", list(pages.keys()), index=list(pages.keys()).index(st.session_state.page))
+        st.session_state.page = choice
         st.markdown("---")
-        st.caption(f"⭐ Обраних пам'яток: {len(st.session_state.favorites)}")
+        n_fav = len(st.session_state.fav_landmarks) + len(st.session_state.fav_restaurants)
+        st.caption(f"❤️ В обраному: {n_fav}")
         st.caption("Демо-платформа про м. Вінниця, зроблена на Streamlit.")
 
-    # get() із запасним варіантом — щоб уникнути KeyError при некоректному значенні
-    pages.get(st.session_state.page, page_home)()
+    pages[st.session_state.page]()
 
 
 if __name__ == "__main__":
