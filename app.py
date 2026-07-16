@@ -4,8 +4,8 @@
 з чат-ботом-гідом, інтерактивною картою, обраним та планувальником маршруту.
 
 Запуск:
-    pip install streamlit pandas
-    streamlit run vinnytsia_app.py
+    pip install -r requirements.txt
+    streamlit run app.py
 """
 
 import streamlit as st
@@ -44,13 +44,13 @@ FACTS = [
     "Вінниця — один із лідерів України за рівнем розвитку велоінфраструктури.",
 ]
 
-# Кожна пам'ятка тепер має координати (lat/lon) для карти та орієнтовний час відвідування
+# Кожна пам'ятка має координати (lat/lon) для карти та орієнтовний час відвідування
 LANDMARKS = [
     {
         "name": "Фонтан Roshen", "category": "Розваги",
         "desc": "Найбільший плавучий світломузичний фонтан у Європі на річці Південний Буг. "
                 "Шоу відбувається у теплу пору року у вечірній час.",
-        "address": "Набережна, біля Кемпи", "lat": 49.2331, "lon": 28.4682,
+        "address": "Набережна, біля Кемпи", "lat": 49.2327, "lon": 28.4707,
         "visit_min": 45,
         "tags": ["фонтан", "roshen", "рошен", "шоу", "музика", "набережна"],
     },
@@ -58,37 +58,37 @@ LANDMARKS = [
         "name": "Музей-садиба М.І. Пирогова «Вишня»", "category": "Музей",
         "desc": "Меморіальний комплекс, де жив і працював видатний хірург Микола Пирогов. "
                 "У церкві-некрополі зберігається забальзамоване тіло вченого.",
-        "address": "вул. Пирогова, 155", "lat": 49.2098, "lon": 28.4917,
+        "address": "вул. Пирогова, 155", "lat": 49.2160, "lon": 28.4084,
         "visit_min": 60,
         "tags": ["пирогов", "музей", "садиба", "вишня", "хірург"],
     },
     {
         "name": "Вінницькі мури (Мури)", "category": "Історія",
         "desc": "Залишки укріплень єзуїтського монастиря XVII століття в історичному центрі.",
-        "address": "Старе місто, центр", "lat": 49.2339, "lon": 28.4823,
+        "address": "Старе місто, вул. Соборна", "lat": 49.2332, "lon": 28.4767,
         "visit_min": 30,
         "tags": ["мури", "фортеця", "історія", "центр", "єзуїти"],
     },
     {
         "name": "Водонапірна вежа", "category": "Архітектура",
         "desc": "Символ Вінниці, споруджена у 1912 році. Нині тут працює виставковий простір.",
-        "address": "вул. Соборна", "lat": 49.2352, "lon": 28.4779,
+        "address": "пл. Європейська", "lat": 49.2346, "lon": 28.4828,
         "visit_min": 30,
-        "tags": ["вежа", "водонапірна", "архітектура", "соборна"],
+        "tags": ["вежа", "водонапірна", "архітектура", "європейська"],
     },
     {
         "name": "Спасо-Преображенський кафедральний собор", "category": "Церква",
         "desc": "Головний православний храм міста з багатою історією та красивим інтер'єром.",
-        "address": "вул. Соборна, 23", "lat": 49.2347, "lon": 28.4805,
+        "address": "вул. Соборна, 23", "lat": 49.2332, "lon": 28.4754,
         "visit_min": 25,
         "tags": ["церква", "собор", "храм", "релігія"],
     },
     {
         "name": "Костел Пресвятої Діви Марії Ангельської", "category": "Церква",
         "desc": "Один з найстаріших католицьких храмів Вінниці, зразок бароккової архітектури.",
-        "address": "Старе місто", "lat": 49.2335, "lon": 28.4810,
+        "address": "вул. Соборна, 12", "lat": 49.2331, "lon": 28.4753,
         "visit_min": 25,
-        "tags": ["костел", "церква", "храм", "барокко"],
+        "tags": ["костел", "церква", "храм", "барокко", "капуцини"],
     },
     {
         "name": "Парк Дружби народів (Центральний парк)", "category": "Парк",
@@ -142,7 +142,7 @@ LANDMARKS = [
     {
         "name": "Вінницький обласний краєзнавчий музей", "category": "Музей",
         "desc": "Один із найстаріших музеїв області з колекціями з археології, природи та етнографії.",
-        "address": "вул. Соборна, 19", "lat": 49.2344, "lon": 28.4788,
+        "address": "вул. Соборна, 19", "lat": 49.2334, "lon": 28.4767,
         "visit_min": 50,
         "tags": ["музей", "краєзнавчий", "археологія", "етнографія"],
     },
@@ -222,7 +222,7 @@ KNOWLEDGE_BASE = {
     "вежа": {
         "keywords": ["вежа", "водонапірна", "водонапирна"],
         "answer": "🗼 **Водонапірна вежа** — символ Вінниці, побудована у 1912 році. "
-                  "Сьогодні в її приміщенні працює виставковий простір. Адреса: вул. Соборна.",
+                  "Сьогодні в її приміщенні працює виставковий простір. Адреса: пл. Європейська.",
     },
     "мури": {
         "keywords": ["мури", "фортеця", "єзуїт"],
@@ -290,21 +290,23 @@ QUICK_QUESTIONS = [
 ]
 
 
+def _contains_phrase(text: str, phrases: list) -> bool:
+    """Перевіряє наявність фрази як окремого слова/виразу (не всередині інших слів)."""
+    return any(re.search(rf"(?<!\w){re.escape(p)}(?!\w)", text) for p in phrases)
+
+
 def get_bot_response(user_text: str) -> str:
     """Проста rule-based логіка чат-бота на основі ключових слів."""
     text = user_text.lower().strip()
-    text_clean = re.sub(r"[^\w\sа-яіїєґ]", "", text)
+    # Роздільники замінюємо на пробіл, щоб слова не "склеювались" (було: "привіт,як" -> "привітяк")
+    text_clean = re.sub(r"[^\w\s]", " ", text)
+    text_clean = re.sub(r"\s+", " ", text_clean)
 
-    if any(g in text_clean for g in GREETINGS):
-        return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте мене про пам'ятки, ресторани, "
-                "події, транспорт чи погоду — і я підкажу!")
-
-    if any(t in text_clean for t in THANKS):
-        return "Будь ласка! 😊 Якщо ще щось цікавить — питайте."
-
+    # 1) Спочатку шукаємо змістовну відповідь — щоб на "Привіт, розкажи про фонтан"
+    #    бот відповідав про фонтан, а не лише вітався
     best_match = None
     best_score = 0
-    for topic, data in KNOWLEDGE_BASE.items():
+    for data in KNOWLEDGE_BASE.values():
         score = sum(1 for kw in data["keywords"] if kw in text_clean)
         if score > best_score:
             best_score = score
@@ -312,6 +314,14 @@ def get_bot_response(user_text: str) -> str:
 
     if best_match:
         return best_match
+
+    # 2) Якщо змістовного збігу немає — обробляємо привітання та подяки
+    if _contains_phrase(text_clean, GREETINGS):
+        return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте мене про пам'ятки, ресторани, "
+                "події, транспорт чи погоду — і я підкажу!")
+
+    if _contains_phrase(text_clean, THANKS):
+        return "Будь ласка! 😊 Якщо ще щось цікавить — питайте."
 
     return ("🤔 Вибачте, я поки не знаю відповіді на це питання. Спробуйте запитати про фонтан Roshen, "
             "музей Пирогова, Вінницькі мури, церкви, парки, ресторани, транспорт, готелі, погоду, "
@@ -325,6 +335,8 @@ def get_bot_response(user_text: str) -> str:
 def init_session_state():
     if "page" not in st.session_state:
         st.session_state.page = "Головна"
+    if "nav_radio" not in st.session_state:
+        st.session_state.nav_radio = st.session_state.page
     if "favorites" not in st.session_state:
         st.session_state.favorites = set()
     if "chat_history" not in st.session_state:
@@ -347,6 +359,18 @@ def landmark_by_name(name: str):
         if item["name"] == name:
             return item
     return None
+
+
+def _sync_nav_from_page():
+    """Програмна зміна сторінки (кнопки швидкого доступу) → оновлюємо стан
+    радіо-перемикача ДО його створення, інакше він перезапише сторінку назад."""
+    if st.session_state.nav_radio != st.session_state.page:
+        st.session_state.nav_radio = st.session_state.page
+
+
+def _on_nav_change():
+    """Користувач обрав сторінку в сайдбарі → оновлюємо поточну сторінку."""
+    st.session_state.page = st.session_state.nav_radio
 
 
 # =========================================================
@@ -403,14 +427,16 @@ def page_home():
     st.markdown("---")
     st.subheader("⚡ Швидкий доступ")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
+    # (колонка, підпис кнопки, цільова сторінка) — ціль вказана явно,
+    # без крихкого розбирання рядка з емодзі
     quick_nav = [
-        (c1, "🗺️ Пам'ятки"), (c2, "🎉 Події"), (c3, "🍽️ Ресторани"),
-        (c4, "🤖 Чат-бот"), (c5, "🧭 Карта"), (c6, "📝 Маршрут"),
+        (c1, "🗺️ Пам'ятки", "Пам'ятки"), (c2, "🎉 Події", "Події"),
+        (c3, "🍽️ Ресторани", "Ресторани"), (c4, "🤖 Чат-бот", "Чат-бот"),
+        (c5, "🧭 Карта", "Карта"), (c6, "📝 Маршрут", "Маршрут"),
     ]
-    for col, label in quick_nav:
-        page_name = label.split(" ", 1)[1]
+    for col, label, target_page in quick_nav:
         if col.button(label, use_container_width=True):
-            st.session_state.page = page_name
+            st.session_state.page = target_page
             st.rerun()
 
     st.markdown("---")
@@ -684,13 +710,17 @@ def main():
 
     with st.sidebar:
         st.markdown("## 🏙️ Моя Вінниця")
-        choice = st.radio("Навігація", list(pages.keys()), index=list(pages.keys()).index(st.session_state.page))
-        st.session_state.page = choice
+        # Синхронізація в обидва боки:
+        #  - page → nav_radio: перед створенням віджета (кнопки швидкого доступу);
+        #  - nav_radio → page: через on_change (вибір користувача в сайдбарі).
+        _sync_nav_from_page()
+        st.radio("Навігація", list(pages.keys()), key="nav_radio", on_change=_on_nav_change)
         st.markdown("---")
         st.caption(f"⭐ Обраних пам'яток: {len(st.session_state.favorites)}")
         st.caption("Демо-платформа про м. Вінниця, зроблена на Streamlit.")
 
-    pages[st.session_state.page]()
+    # get() із запасним варіантом — щоб уникнути KeyError при некоректному значенні
+    pages.get(st.session_state.page, page_home)()
 
 
 if __name__ == "__main__":
