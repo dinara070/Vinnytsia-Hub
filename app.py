@@ -1267,13 +1267,12 @@ def main():
 
     with st.sidebar:
         st.markdown("## 🏙️ Моя Вінниця 🌻")
-        choice = st.radio(
+        st.radio(
             "Навігація",
             list(pages.keys()),
-            index=list(pages.keys()).index(st.session_state.page),
+            key="page",
             format_func=lambda p: f"{PAGE_ICONS.get(p, '📌')}  {p}",
         )
-        st.session_state.page = choice
         section_divider("🌿")
         n_fav = len(st.session_state.fav_landmarks) + len(st.session_state.fav_restaurants)
         st.caption(f"❤️ В обраному: {n_fav}")
