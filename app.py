@@ -22,6 +22,12 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
+
 # =========================================================
 #                       НАЛАШТУВАННЯ СТОРІНКИ
 # =========================================================
@@ -44,6 +50,8 @@ PAGE_ICONS = {
     "Події": "🎉",
     "Ресторани": "🍽️",
     "Маршрут": "🧭",
+    "Мої плани": "📔",
+    "Транспорт онлайн": "🚌",
     "Обране": "❤️",
     "Чат-бот": "🤖",
     "Про місто": "ℹ️",
@@ -124,7 +132,12 @@ LANDMARKS = [
         "hours": "Травень–Жовтень, шоу ~21:00 та ~22:00",
         "price": "Безкоштовно",
         "base_rating": 4.9,
-        "img": "https://source.unsplash.com/400x260/?fountain,night",
+        "img": "https://picsum.photos/seed/vinnytsialandmark1/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark1a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark1b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark1c/700/450",
+        ],
     },
     {
         "name": "Музей-садиба М.І. Пирогова «Вишня»",
@@ -137,7 +150,12 @@ LANDMARKS = [
         "hours": "Вт–Нд, 09:00–17:00",
         "price": "60 грн",
         "base_rating": 4.8,
-        "img": "https://source.unsplash.com/400x260/?museum,manor",
+        "img": "https://picsum.photos/seed/vinnytsialandmark2/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark2a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark2b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark2c/700/450",
+        ],
     },
     {
         "name": "Вінницькі мури (Мури)",
@@ -150,7 +168,12 @@ LANDMARKS = [
         "hours": "Цілодобово (зовнішній огляд)",
         "price": "Безкоштовно",
         "base_rating": 4.5,
-        "img": "https://source.unsplash.com/400x260/?old,wall,fortress",
+        "img": "https://picsum.photos/seed/vinnytsialandmark3/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark3a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark3b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark3c/700/450",
+        ],
     },
     {
         "name": "Водонапірна вежа",
@@ -162,7 +185,12 @@ LANDMARKS = [
         "hours": "Ср–Нд, 10:00–18:00",
         "price": "40 грн",
         "base_rating": 4.6,
-        "img": "https://source.unsplash.com/400x260/?water,tower",
+        "img": "https://picsum.photos/seed/vinnytsialandmark4/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark4a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark4b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark4c/700/450",
+        ],
     },
     {
         "name": "Спасо-Преображенський кафедральний собор",
@@ -174,7 +202,12 @@ LANDMARKS = [
         "hours": "Щодня, 07:00–19:00",
         "price": "Безкоштовно",
         "base_rating": 4.7,
-        "img": "https://source.unsplash.com/400x260/?cathedral,orthodox",
+        "img": "https://picsum.photos/seed/vinnytsialandmark5/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark5a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark5b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark5c/700/450",
+        ],
     },
     {
         "name": "Костел Пресвятої Діви Марії Ангельської",
@@ -186,7 +219,12 @@ LANDMARKS = [
         "hours": "Щодня, 08:00–18:00",
         "price": "Безкоштовно",
         "base_rating": 4.6,
-        "img": "https://source.unsplash.com/400x260/?church,baroque",
+        "img": "https://picsum.photos/seed/vinnytsialandmark6/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark6a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark6b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark6c/700/450",
+        ],
     },
     {
         "name": "Парк Дружби народів (Центральний парк)",
@@ -198,7 +236,12 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.7,
-        "img": "https://source.unsplash.com/400x260/?park,alley",
+        "img": "https://picsum.photos/seed/vinnytsialandmark7/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark7a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark7b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark7c/700/450",
+        ],
     },
     {
         "name": "Театральна площа",
@@ -210,7 +253,12 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.5,
-        "img": "https://source.unsplash.com/400x260/?theatre,square",
+        "img": "https://picsum.photos/seed/vinnytsialandmark8/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark8a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark8b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark8c/700/450",
+        ],
     },
     {
         "name": "Музей історії міста Вінниці",
@@ -222,7 +270,12 @@ LANDMARKS = [
         "hours": "Вт–Нд, 09:00–17:00",
         "price": "50 грн",
         "base_rating": 4.4,
-        "img": "https://source.unsplash.com/400x260/?history,museum",
+        "img": "https://picsum.photos/seed/vinnytsialandmark9/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark9a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark9b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark9c/700/450",
+        ],
     },
     {
         "name": "Синагога «Бейт Кнесет»",
@@ -234,7 +287,12 @@ LANDMARKS = [
         "hours": "За розкладом богослужінь",
         "price": "Безкоштовно",
         "base_rating": 4.5,
-        "img": "https://source.unsplash.com/400x260/?synagogue",
+        "img": "https://picsum.photos/seed/vinnytsialandmark10/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark10a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark10b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark10c/700/450",
+        ],
     },
     {
         "name": "Аптека-музей",
@@ -247,7 +305,12 @@ LANDMARKS = [
         "hours": "Пн–Сб, 09:00–19:00",
         "price": "30 грн",
         "base_rating": 4.6,
-        "img": "https://source.unsplash.com/400x260/?pharmacy,old",
+        "img": "https://picsum.photos/seed/vinnytsialandmark11/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark11a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark11b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark11c/700/450",
+        ],
     },
     {
         "name": "Пам'ятник Устиму Кармалюку",
@@ -260,7 +323,12 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.2,
-        "img": "https://source.unsplash.com/400x260/?monument,statue",
+        "img": "https://picsum.photos/seed/vinnytsialandmark12/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark12a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark12b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark12c/700/450",
+        ],
     },
     {
         "name": "Вулиця Соборна",
@@ -273,7 +341,12 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.7,
-        "img": "https://source.unsplash.com/400x260/?pedestrian,street,europe",
+        "img": "https://picsum.photos/seed/vinnytsialandmark13/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark13a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark13b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark13c/700/450",
+        ],
     },
     {
         "name": "Кемпа (острів відпочинку)",
@@ -286,7 +359,12 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.6,
-        "img": "https://source.unsplash.com/400x260/?river,island,park",
+        "img": "https://picsum.photos/seed/vinnytsialandmark14/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark14a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark14b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark14c/700/450",
+        ],
     },
     {
         "name": "Ботанічний сад «Поділля»",
@@ -299,7 +377,12 @@ LANDMARKS = [
         "hours": "Щодня, 08:00–18:00",
         "price": "20 грн",
         "base_rating": 4.5,
-        "img": "https://source.unsplash.com/400x260/?botanical,garden",
+        "img": "https://picsum.photos/seed/vinnytsialandmark15/500/320",
+        "gallery": [
+            "https://picsum.photos/seed/vinnytsialandmark15a/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark15b/700/450",
+            "https://picsum.photos/seed/vinnytsialandmark15c/700/450",
+        ],
     },
 ]
 
@@ -526,6 +609,23 @@ KNOWLEDGE_BASE = {
         "answer": "🗺️ Скористайтеся сторінкою **«Маршрут»** — оберіть пам'ятки, і я складу для вас "
                   "оптимальний порядок відвідування з орієнтовним часом.",
     },
+    "мої плани": {
+        "keywords": ["мої плани", "відвідано", "хронологія", "щоденник", "враження", "мій прогрес"],
+        "answer": "📔 На сторінці **«Мої плани»** ви побачите візуальну хронологію відвіданих пам'яток. "
+                  "Позначайте місця кнопкою «✅ Позначити як відвідано» на сторінці «Пам'ятки» — "
+                  "і вони з'являться там із датою та вашими нотатками.",
+    },
+    "транспорт онлайн": {
+        "keywords": ["де тролейбус", "де трамвай", "транспорт зараз", "живий транспорт", "реальний час", "gps транспорт"],
+        "answer": "🚌 На сторінці **«Транспорт онлайн»** є демонстраційна карта руху транспорту та посилання "
+                  "на офіційні джерела (map.et.vn.ua, EasyWay) для перегляду реального розташування "
+                  "тролейбусів і трамваїв.",
+    },
+    "фото": {
+        "keywords": ["фото", "фотографії", "галерея", "зображення", "картинки"],
+        "answer": "📸 У кожної пам'ятки на сторінці «Пам'ятки» є розділ **«Фотогалерея»** — розгорніть його, "
+                  "щоб погортати кілька фото цього місця.",
+    },
     "освіта": {
         "keywords": ["освіта", "університет", "навчання", "студент"],
         "answer": "🎓 У Вінниці працюють кілька провідних ЗВО, зокрема **ВНТУ** та "
@@ -602,6 +702,12 @@ def init_state():
         st.session_state.last_route = []
     if "import_message" not in st.session_state:
         st.session_state.import_message = None
+    if "visited" not in st.session_state:
+        st.session_state.visited = {}  # {landmark_name: {"date": "YYYY-MM-DD", "note": str}}
+    if "transport_positions" not in st.session_state:
+        st.session_state.transport_positions = None
+    if "transport_tick" not in st.session_state:
+        st.session_state.transport_tick = 0
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -667,7 +773,64 @@ def build_route(selected_names, start_time_str):
     return route, current.strftime("%H:%M")
 
 
-def export_snapshot():
+def mark_visited(name, note=""):
+    st.session_state.visited[name] = {
+        "date": date.today().isoformat(),
+        "note": note,
+    }
+
+
+def unmark_visited(name):
+    st.session_state.visited.pop(name, None)
+
+
+def get_visited_sorted():
+    """Повертає відвідані пам'ятки, відсортовані за датою (від найновіших)."""
+    name_to_item = {i["name"]: i for i in LANDMARKS}
+    entries = []
+    for name, info in st.session_state.visited.items():
+        item = name_to_item.get(name)
+        if item:
+            entries.append({"name": name, "date": info.get("date", ""), "note": info.get("note", ""), "item": item})
+    entries.sort(key=lambda x: x["date"], reverse=True)
+    return entries
+
+
+# --- Демо-симуляція транспорту в реальному часі ------------------------------
+# ПРИМІТКА: офіційна система GPS-моніторингу транспорту Вінниці (map.et.vn.ua,
+# КП "Вінницякартсервіс") є закритою для стороннього комерційного використання
+# й не надає публічного відкритого API. Тому нижче реалізовано наочну ДЕМО-симуляцію
+# руху транспорту навколо реальних зупинок/маршрутів — вона чітко позначена як демо
+# і не видається за справжні дані. За реальним рухом дивіться офіційні джерела нижче.
+TRANSPORT_ROUTES = [
+    {"line": "Тролейбус №4", "type": "🚎", "lat": 49.2331, "lon": 28.4682},
+    {"line": "Тролейбус №7", "type": "🚎", "lat": 49.2365, "lon": 28.4610},
+    {"line": "Трамвай №3", "type": "🚋", "lat": 49.2285, "lon": 28.4755},
+    {"line": "Автобус №20", "type": "🚌", "lat": 49.2410, "lon": 28.4820},
+    {"line": "Маршрутка №2А", "type": "🚐", "lat": 49.2260, "lon": 28.4590},
+]
+
+OFFICIAL_TRANSPORT_LINKS = [
+    {"name": "Онлайн-карта руху транспорту (КП «Вінницякартсервіс»)", "url": "https://map.et.vn.ua/"},
+    {"name": "Маршрути Вінниці на EasyWay", "url": "https://www.eway.in.ua/ua/cities/vinnytsia/routes"},
+    {"name": "Розклад руху транспорту (rozklad.in.ua)", "url": "https://vn.rozklad.in.ua/"},
+]
+
+
+def simulate_transport_tick():
+    """Генерує/оновлює демонстраційні координати транспорту випадковим 'блуканням' навколо базових точок."""
+    import random
+    if st.session_state.transport_positions is None:
+        st.session_state.transport_positions = [dict(t) for t in TRANSPORT_ROUTES]
+
+    for pos in st.session_state.transport_positions:
+        pos["lat"] += random.uniform(-0.0025, 0.0025)
+        pos["lon"] += random.uniform(-0.0025, 0.0025)
+    st.session_state.transport_tick += 1
+    return st.session_state.transport_positions
+
+
+
     """Формує JSON-знімок усіх даних користувача для експорту."""
     snapshot = {
         "app_version": APP_VERSION,
@@ -677,6 +840,7 @@ def export_snapshot():
         "reviews": st.session_state.reviews,
         "feedback_log": st.session_state.feedback_log,
         "last_route": st.session_state.last_route,
+        "visited": st.session_state.visited,
     }
     return json.dumps(snapshot, ensure_ascii=False, indent=2)
 
@@ -689,6 +853,7 @@ def import_snapshot(raw_text):
     st.session_state.reviews = data.get("reviews", {})
     st.session_state.feedback_log = data.get("feedback_log", [])
     st.session_state.last_route = data.get("last_route", [])
+    st.session_state.visited = data.get("visited", {})
 
 
 def landmarks_to_csv():
@@ -801,6 +966,43 @@ def render_header():
             color: white;
             border-color: #2e7d32;
         }
+        .timeline {
+            border-left: 3px solid #66bb6a;
+            margin-left: 12px;
+            padding-left: 24px;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 22px;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -31px;
+            top: 4px;
+            width: 14px;
+            height: 14px;
+            background: #2e7d32;
+            border-radius: 50%;
+            border: 2px solid #f1f8e9;
+        }
+        .timeline-card {
+            background: #f1f8e9;
+            border: 1px solid #c5e1a5;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+        }
+        .timeline-date {
+            color: #2e7d32;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .transport-card {
+            background: #f1f8e9;
+            border: 1px solid #c5e1a5;
+            border-radius: 10px;
+            padding: 0.6rem 0.9rem;
+            margin-bottom: 8px;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -849,18 +1051,23 @@ def page_home():
 
     section_divider("🌿")
     st.subheader("⚡ Швидкий доступ")
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("🗺️ Пам'ятки", use_container_width=True):
+    row1 = st.columns(4)
+    row2 = st.columns(4)
+    if row1[0].button("🗺️ Пам'ятки", use_container_width=True):
         st.session_state.page = "Пам'ятки"; st.rerun()
-    if c2.button("🎉 Події", use_container_width=True):
+    if row1[1].button("🎉 Події", use_container_width=True):
         st.session_state.page = "Події"; st.rerun()
-    if c3.button("🍽️ Ресторани", use_container_width=True):
+    if row1[2].button("🍽️ Ресторани", use_container_width=True):
         st.session_state.page = "Ресторани"; st.rerun()
-    if c4.button("🧭 Маршрут", use_container_width=True):
+    if row1[3].button("🧭 Маршрут", use_container_width=True):
         st.session_state.page = "Маршрут"; st.rerun()
-    if c5.button("🤖 Чат-бот", use_container_width=True):
+    if row2[0].button("📔 Мої плани", use_container_width=True):
+        st.session_state.page = "Мої плани"; st.rerun()
+    if row2[1].button("🚌 Транспорт онлайн", use_container_width=True):
+        st.session_state.page = "Транспорт онлайн"; st.rerun()
+    if row2[2].button("🤖 Чат-бот", use_container_width=True):
         st.session_state.page = "Чат-бот"; st.rerun()
-    if c6.button("💾 Експорт/Імпорт", use_container_width=True):
+    if row2[3].button("💾 Експорт/Імпорт", use_container_width=True):
         st.session_state.page = "Експорт/Імпорт"; st.rerun()
 
     section_divider("💚")
@@ -944,13 +1151,41 @@ def page_landmarks():
                 st.write(f"📝 {item['desc']}")
 
                 is_fav = item["name"] in st.session_state.fav_landmarks
-                label = "💔 Прибрати з обраного" if is_fav else "❤️ Додати в обране"
-                if st.button(label, key=f"fav_{item['name']}"):
+                fav_label = "💔 Прибрати з обраного" if is_fav else "❤️ Додати в обране"
+                is_visited = item["name"] in st.session_state.visited
+                visit_label = "↩️ Скасувати відвідування" if is_visited else "✅ Позначити як відвідано"
+
+                bc1, bc2 = st.columns(2)
+                if bc1.button(fav_label, key=f"fav_{item['name']}", use_container_width=True):
                     if is_fav:
                         st.session_state.fav_landmarks.discard(item["name"])
                     else:
                         st.session_state.fav_landmarks.add(item["name"])
                     st.rerun()
+                if bc2.button(visit_label, key=f"visit_{item['name']}", use_container_width=True):
+                    if is_visited:
+                        unmark_visited(item["name"])
+                    else:
+                        mark_visited(item["name"])
+                    st.rerun()
+                if is_visited:
+                    st.caption(f"✅ Відвідано {st.session_state.visited[item['name']]['date']}")
+
+                with st.expander("📸 Фотогалерея"):
+                    gallery = item.get("gallery") or [item["img"]]
+                    gkey = f"gallery_idx_{item['name']}"
+                    if gkey not in st.session_state:
+                        st.session_state[gkey] = 0
+                    g_idx = st.session_state[gkey] % len(gallery)
+                    st.image(gallery[g_idx], use_container_width=True)
+                    st.caption(f"Фото {g_idx + 1} з {len(gallery)}")
+                    gp, gn = st.columns(2)
+                    if gp.button("◀️ Попереднє", key=f"prev_{item['name']}", use_container_width=True):
+                        st.session_state[gkey] = (g_idx - 1) % len(gallery)
+                        st.rerun()
+                    if gn.button("▶️ Наступне", key=f"next_{item['name']}", use_container_width=True):
+                        st.session_state[gkey] = (g_idx + 1) % len(gallery)
+                        st.rerun()
 
                 with st.expander("💬 Відгуки та оцінка"):
                     revs = st.session_state.reviews.get(item["name"], [])
@@ -1084,9 +1319,138 @@ def page_route():
                 mime="text/plain",
             )
 
+    section_divider("🧭")
+    st.caption(
+        "💡 Порада: після відвідування пам'ятки не забудьте позначити її як «✅ Відвідано» "
+        "на сторінці «Пам'ятки» — вона з'явиться у вашій хронології на сторінці «Мої плани»."
+    )
+
+
+def page_my_plans():
+    st.header("📔 Мої плани — хронологія відвідувань")
+    st.caption("Особистий щоденник подорожі: позначайте пам'ятки як відвідані на сторінці «Пам'ятки», "
+               "а тут дивіться свою візуальну хронологію.")
+
+    total = len(LANDMARKS)
+    visited_count = len(st.session_state.visited)
+    progress = visited_count / total if total else 0
+
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.progress(progress, text=f"Відвідано {visited_count} з {total} пам'яток ({int(progress * 100)}%)")
+    with c2:
+        st.metric("🏅 Прогрес", f"{int(progress * 100)}%")
+
+    if visited_count == 0:
+        st.info(
+            "Ви ще не позначили жодної пам'ятки як відвідану. Перейдіть на сторінку «🗺️ Пам'ятки» "
+            "та натисніть «✅ Позначити як відвідано» під потрібною карткою."
+        )
+        return
+
+    section_divider("📔")
+    st.subheader("🕰️ Хронологія відвідувань")
+
+    entries = get_visited_sorted()
+    html_parts = ["<div class='timeline'>"]
+    for e in entries:
+        item = e["item"]
+        cat_icon = CATEGORY_ICONS.get(item["category"], "📍")
+        note_html = f"<p style='margin-top:6px;'>💭 {e['note']}</p>" if e["note"] else ""
+        html_parts.append(
+            "<div class='timeline-item'>"
+            "<div class='timeline-dot'></div>"
+            "<div class='timeline-card'>"
+            f"<div class='timeline-date'>📅 {e['date']}</div>"
+            f"<div style='font-size:1.05rem;margin-top:2px;'>{cat_icon} <strong>{item['name']}</strong></div>"
+            f"<div style='color:#555;font-size:0.85rem;'>{item['category']} · 📍 {item['address']}</div>"
+            f"{note_html}"
+            "</div>"
+            "</div>"
+        )
+    html_parts.append("</div>")
+    st.markdown("".join(html_parts), unsafe_allow_html=True)
+
+    section_divider("📝")
+    st.subheader("✍️ Додати нотатку до відвідування")
+    visited_names = list(st.session_state.visited.keys())
+    chosen = st.selectbox("Оберіть відвідану пам'ятку", visited_names)
+    current_note = st.session_state.visited.get(chosen, {}).get("note", "")
+    new_note = st.text_area("Ваші враження про це місце", value=current_note, key=f"note_{chosen}")
+    if st.button("💾 Зберегти нотатку"):
+        st.session_state.visited[chosen]["note"] = new_note
+        st.success("Нотатку збережено!")
+        st.rerun()
+
+    section_divider("🎯")
+    st.subheader("🎯 Ще не відвідано")
+    not_visited = [i for i in LANDMARKS if i["name"] not in st.session_state.visited]
+    if not_visited:
+        cols = st.columns(3)
+        for idx, item in enumerate(not_visited):
+            cat_icon = CATEGORY_ICONS.get(item["category"], "📍")
+            with cols[idx % 3]:
+                st.markdown(f"{cat_icon} {item['name']}")
+    else:
+        st.success("🎉 Вітаємо! Ви відвідали всі пам'ятки зі списку!")
+
+
+def page_transport_live():
+    st.header("🚌 Транспорт онлайн")
+    st.info(
+        "ℹ️ Офіційна система GPS-моніторингу громадського транспорту Вінниці належить "
+        "КП «Вінницякартсервіс» і не надає відкритого публічного API для сторонніх застосунків. "
+        "Нижче — наочна **демо-симуляція** руху транспорту для ілюстрації того, як виглядатиме "
+        "ця функція після підключення офіційного API. Для реального відстеження скористайтесь "
+        "офіційними джерелами нижче."
+    )
+
+    with st.expander("🔗 Офіційні джерела реального руху транспорту"):
+        for link in OFFICIAL_TRANSPORT_LINKS:
+            st.markdown(f"- [{link['name']}]({link['url']})")
+
+    section_divider("🚌")
+    st.subheader("🗺️ Демо-карта руху транспорту")
+
+    c1, c2 = st.columns([1, 3])
+    with c1:
+        if st.button("🔄 Оновити позиції", use_container_width=True):
+            simulate_transport_tick()
+            st.rerun()
+        auto = st.checkbox("Демо-автооновлення", value=False)
+
+    positions = st.session_state.transport_positions or simulate_transport_tick()
+
+    if HAS_PANDAS:
+        map_df = pd.DataFrame([{"lat": p["lat"], "lon": p["lon"]} for p in positions])
+        with c2:
+            st.map(map_df)
+    else:
+        with c2:
+            st.warning("Встановіть `pandas` (`pip install pandas`), щоб побачити карту: `pip install -r requirements.txt`.")
+
+    st.caption(f"🔁 Оновлень демо-руху: {st.session_state.transport_tick}")
+
+    section_divider("🚏")
+    st.subheader("📋 Умовний список бортів поруч")
+    for p in positions:
+        st.markdown(
+            f"<div class='transport-card'>{p['type']} <strong>{p['line']}</strong> · "
+            f"координати: {p['lat']:.4f}, {p['lon']:.4f} · "
+            f"<span style='color:#2e7d32;'>демо-дані</span></div>",
+            unsafe_allow_html=True,
+        )
+
+    if auto:
+        import time as _time
+        _time.sleep(2)
+        simulate_transport_tick()
+        st.rerun()
+
 
 def page_favorites():
     st.header("❤️ Обране")
+
     if not st.session_state.fav_landmarks and not st.session_state.fav_restaurants:
         st.info("Ви ще нічого не додали в обране. Натисніть ❤️ на сторінках «Пам'ятки» або «Ресторани».")
         return
@@ -1258,6 +1622,8 @@ def main():
         "Події": page_events,
         "Ресторани": page_restaurants,
         "Маршрут": page_route,
+        "Мої плани": page_my_plans,
+        "Транспорт онлайн": page_transport_live,
         "Обране": page_favorites,
         "Чат-бот": page_chatbot,
         "Про місто": page_about,
