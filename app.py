@@ -34,7 +34,59 @@ st.set_page_config(
 
 VINNYTSIA_LAT = 49.2331
 VINNYTSIA_LON = 28.4682
-APP_VERSION = "1.2"
+APP_VERSION = "1.3"
+
+# Емодзі-іконки для категорій, типів і навігації — суто візуальне покращення,
+# кольорова гама та стиль платформи залишаються незмінними.
+PAGE_ICONS = {
+    "Головна": "🏠",
+    "Пам'ятки": "🗺️",
+    "Події": "🎉",
+    "Ресторани": "🍽️",
+    "Маршрут": "🧭",
+    "Обране": "❤️",
+    "Чат-бот": "🤖",
+    "Про місто": "ℹ️",
+    "Зворотний зв'язок": "📝",
+    "Експорт/Імпорт": "💾",
+}
+
+CATEGORY_ICONS = {
+    "Розваги": "🎡",
+    "Музей": "🏛️",
+    "Історія": "📜",
+    "Архітектура": "🏗️",
+    "Церква": "⛪",
+    "Парк": "🌳",
+    "Центр": "🚶",
+    "Релігія": "🕍",
+    "Пам'ятник": "🗿",
+}
+
+RESTAURANT_ICONS = {
+    "Українська кухня": "🥟",
+    "Українська / пиво": "🍺",
+    "Італійська": "🍕",
+    "Японська": "🍣",
+    "Кав'ярня": "☕",
+    "Стейки": "🥩",
+    "Вегетаріанська/веганська": "🥗",
+}
+
+EVENT_ICONS = {
+    "Музика": "🎷",
+    "Їжа": "🍔",
+    "Культура": "🎭",
+    "Сім'я": "👨‍👩‍👧‍👦",
+}
+
+STAT_ICONS = {
+    "Населення": "👥",
+    "Рік заснування": "🏛️",
+    "Площа": "📐",
+    "Область": "🗺️",
+    "Річка": "🌊",
+}
 
 # =========================================================
 #                       ДАНІ ПРО МІСТО
@@ -687,16 +739,67 @@ def render_header():
             background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 60%, #66bb6a 100%);
             color: white;
             text-align: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.6rem;
+            box-shadow: 0 6px 18px rgba(27, 94, 32, 0.25);
         }
         .hero h1 { font-size: 2.6rem; margin-bottom: 0.3rem; }
         .hero p { font-size: 1.1rem; opacity: 0.95; }
+        .hero-emojis {
+            text-align: center;
+            font-size: 1.3rem;
+            letter-spacing: 0.6rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.9;
+        }
         .stat-box {
             background: #f1f8e9;
             border-radius: 12px;
             padding: 1rem;
             text-align: center;
             border: 1px solid #c5e1a5;
+            transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .stat-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 14px rgba(102, 187, 106, 0.35);
+        }
+        .stat-box .stat-icon { font-size: 1.6rem; }
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 999px;
+            background: #e8f5e9;
+            color: #1b5e20;
+            font-size: 0.78rem;
+            margin: 2px 4px 2px 0;
+            border: 1px solid #a5d6a7;
+        }
+        .badge-price {
+            background: #fff8e1;
+            color: #8d6e00;
+            border: 1px solid #ffe082;
+        }
+        .badge-rating {
+            background: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ffcc80;
+        }
+        .section-divider {
+            text-align: center;
+            color: #66bb6a;
+            letter-spacing: 0.5rem;
+            margin: 0.5rem 0 1.2rem 0;
+            font-size: 1rem;
+        }
+        .stButton>button {
+            border-radius: 10px;
+            border: 1px solid #a5d6a7;
+            transition: all 0.15s ease-in-out;
+        }
+        .stButton>button:hover {
+            background-color: #2e7d32;
+            color: white;
+            border-color: #2e7d32;
         }
         </style>
         """,
@@ -704,13 +807,18 @@ def render_header():
     )
 
 
+def section_divider(emoji="🌿"):
+    st.markdown(f"<div class='section-divider'>{emoji} &nbsp; {emoji} &nbsp; {emoji}</div>", unsafe_allow_html=True)
+
+
 def page_home():
     st.markdown(
         """
         <div class="hero">
             <h1>🏙️ Моя Вінниця</h1>
-            <p>Відкрийте для себе пам'ятки, події та смаки одного з найкрасивіших міст України</p>
+            <p>Відкрийте для себе пам'ятки, події та смаки одного з найкрасивіших міст України ✨</p>
         </div>
+        <div class="hero-emojis">💧 🏰 🌳 ⛪ 🍽️ 🎉</div>
         """,
         unsafe_allow_html=True,
     )
@@ -732,12 +840,14 @@ def page_home():
     cols = st.columns(len(CITY_STATS))
     for col, (label, value) in zip(cols, CITY_STATS.items()):
         with col:
+            icon = STAT_ICONS.get(label, "📌")
             st.markdown(
-                f"<div class='stat-box'><h3>{value}</h3><p>{label}</p></div>",
+                f"<div class='stat-box'><div class='stat-icon'>{icon}</div>"
+                f"<h3>{value}</h3><p>{label}</p></div>",
                 unsafe_allow_html=True,
             )
 
-    st.markdown("---")
+    section_divider("🌿")
     st.subheader("⚡ Швидкий доступ")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     if c1.button("🗺️ Пам'ятки", use_container_width=True):
@@ -753,12 +863,12 @@ def page_home():
     if c6.button("💾 Експорт/Імпорт", use_container_width=True):
         st.session_state.page = "Експорт/Імпорт"; st.rerun()
 
-    st.markdown("---")
+    section_divider("💚")
     st.subheader("💡 Цікаві факти")
     for fact in FACTS:
-        st.markdown(f"- {fact}")
+        st.markdown(f"✨ {fact}")
 
-    st.markdown("---")
+    section_divider("🔍")
     st.subheader("🔎 Загальний пошук по платформі")
     query = st.text_input("Введіть назву пам'ятки, події чи ресторану", key="global_search")
     if query:
@@ -771,17 +881,20 @@ def page_home():
             st.warning("Нічого не знайдено 🤷")
         else:
             if found_landmarks:
-                st.markdown("**Пам'ятки:**")
+                st.markdown("**🗺️ Пам'ятки:**")
                 for i in found_landmarks:
-                    st.write(f"📍 {i['name']} — {i['category']}")
+                    icon = CATEGORY_ICONS.get(i["category"], "📍")
+                    st.write(f"{icon} {i['name']} — {i['category']}")
             if found_events:
-                st.markdown("**Події:**")
+                st.markdown("**🎉 Події:**")
                 for e in found_events:
-                    st.write(f"🎉 {e['name']} — {e['date']}")
+                    icon = EVENT_ICONS.get(e["type"], "🎉")
+                    st.write(f"{icon} {e['name']} — {e['date']}")
             if found_rest:
-                st.markdown("**Ресторани:**")
+                st.markdown("**🍽️ Ресторани:**")
                 for r in found_rest:
-                    st.write(f"🍽️ {r['name']} — {r['type']}, ⭐{r['rating']}")
+                    icon = RESTAURANT_ICONS.get(r["type"], "🍽️")
+                    st.write(f"{icon} {r['name']} — {r['type']}, ⭐{r['rating']}")
 
 
 def page_landmarks():
@@ -817,13 +930,18 @@ def page_landmarks():
         with cols[idx % 2]:
             with st.container(border=True):
                 st.image(item["img"], use_container_width=True)
-                st.subheader(item["name"])
+                cat_icon = CATEGORY_ICONS.get(item["category"], "📍")
+                st.subheader(f"{cat_icon} {item['name']}")
                 avg, n_reviews = average_rating(item["name"], item["base_rating"])
-                st.caption(
-                    f"{item['category']} · ⭐ {avg} ({n_reviews} відгуків) · ⏱ ~{item['duration']} хв\n\n"
-                    f"🕒 {item['hours']} · 💵 {item['price']} · 📍 {item['address']}"
+                st.markdown(
+                    f"<span class='badge'>{cat_icon} {item['category']}</span>"
+                    f"<span class='badge badge-rating'>⭐ {avg} ({n_reviews})</span>"
+                    f"<span class='badge'>⏱ ~{item['duration']} хв</span>"
+                    f"<span class='badge badge-price'>💵 {item['price']}</span>",
+                    unsafe_allow_html=True,
                 )
-                st.write(item["desc"])
+                st.caption(f"🕒 {item['hours']} &nbsp;·&nbsp; 📍 {item['address']}", unsafe_allow_html=True)
+                st.write(f"📝 {item['desc']}")
 
                 is_fav = item["name"] in st.session_state.fav_landmarks
                 label = "💔 Прибрати з обраного" if is_fav else "❤️ Додати в обране"
@@ -877,14 +995,21 @@ def page_events():
         st.info("За обраними фільтрами подій не знайдено.")
 
     for ev in events_to_show:
+        ev_icon = EVENT_ICONS.get(ev["type"], "🎉")
         with st.container(border=True):
             c1, c2 = st.columns([3, 1])
             with c1:
-                st.subheader(f"{ev['name']}  ·  🏷️ {ev['type']}")
+                st.subheader(f"{ev_icon} {ev['name']}")
+                st.markdown(
+                    f"<span class='badge'>{ev_icon} {ev['type']}</span>"
+                    f"<span class='badge badge-price'>💵 {ev['price']}</span>"
+                    f"<span class='badge'>📅 ~{ev['days']} дн.</span>",
+                    unsafe_allow_html=True,
+                )
                 st.write(ev["desc"])
-                st.caption(f"📍 {ev['place']} · 💵 {ev['price']} · 📅 Тривалість: ~{ev['days']} дн.")
+                st.caption(f"📍 {ev['place']}")
             with c2:
-                st.metric("Період", ev["date"])
+                st.metric("🗓️ Період", ev["date"])
 
 
 def page_restaurants():
@@ -909,14 +1034,15 @@ def page_restaurants():
 
     for r in data:
         stars = "⭐" * int(round(r["rating"]))
+        r_icon = RESTAURANT_ICONS.get(r["type"], "🍽️")
         with st.container(border=True):
             c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
             c1.markdown(
-                f"**{r['name']}**  \n_{r['type']}_  \n"
+                f"**{r_icon} {r['name']}**  \n_{r['type']}_  \n"
                 f"📍 {r['address']} · 🕒 {r['hours']} · ☎ {r['phone']}"
             )
             c2.write(f"{stars} {r['rating']}")
-            c3.write(f"Цінник: {r['price']}")
+            c3.markdown(f"<span class='badge badge-price'>💵 {r['price']}</span>", unsafe_allow_html=True)
             is_fav = r["name"] in st.session_state.fav_restaurants
             label = "💔" if is_fav else "❤️"
             if c4.button(label, key=f"fav_r_{r['name']}"):
@@ -1016,7 +1142,7 @@ def page_feedback():
                 st.warning("Будь ласка, напишіть повідомлення перед відправкою.")
 
     if st.session_state.feedback_log:
-        st.markdown("---")
+        section_divider("🌿")
         st.subheader("Останні відгуки")
         for fb in reversed(st.session_state.feedback_log[-5:]):
             st.markdown(f"**{fb['name']}** — {'⭐' * fb['rating']}")
@@ -1034,10 +1160,11 @@ def page_chatbot():
             st.session_state.chat_history.append({"role": "user", "content": q})
             st.session_state.chat_history.append({"role": "assistant", "content": get_bot_response(q)})
 
-    st.markdown("---")
+    section_divider("🌿")
 
     for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]):
+        avatar = "🤖" if msg["role"] == "assistant" else "🙂"
+        with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
     user_input = st.chat_input("Напишіть повідомлення...")
@@ -1073,7 +1200,7 @@ def page_export_import():
     with st.expander("Переглянути вміст файлу перед завантаженням"):
         st.code(snapshot_json, language="json")
 
-    st.markdown("---")
+    section_divider("🌿")
     st.subheader("⬆️ Імпорт особистих даних")
     st.caption("Завантажте раніше збережений JSON-файл, щоб відновити обране, відгуки та маршрут.")
     uploaded = st.file_uploader("Оберіть файл резервної копії (.json)", type=["json"])
@@ -1087,7 +1214,7 @@ def page_export_import():
             except Exception as e:
                 st.error(f"Не вдалося імпортувати файл: {e}")
 
-    st.markdown("---")
+    section_divider("🌿")
     st.subheader("📂 Експорт довідкових каталогів (CSV)")
     c1, c2, c3 = st.columns(3)
     c1.download_button(
@@ -1103,7 +1230,7 @@ def page_export_import():
         file_name="vinnytsia_restaurants.csv", mime="text/csv",
     )
 
-    st.markdown("---")
+    section_divider("🌿")
     st.subheader("🧭 Експорт маршруту")
     if st.session_state.last_route:
         finish = st.session_state.last_route[-1]["end"] if st.session_state.last_route else ""
@@ -1139,14 +1266,19 @@ def main():
     }
 
     with st.sidebar:
-        st.markdown("## 🏙️ Моя Вінниця")
-        choice = st.radio("Навігація", list(pages.keys()), index=list(pages.keys()).index(st.session_state.page))
+        st.markdown("## 🏙️ Моя Вінниця 🌻")
+        choice = st.radio(
+            "Навігація",
+            list(pages.keys()),
+            index=list(pages.keys()).index(st.session_state.page),
+            format_func=lambda p: f"{PAGE_ICONS.get(p, '📌')}  {p}",
+        )
         st.session_state.page = choice
-        st.markdown("---")
+        section_divider("🌿")
         n_fav = len(st.session_state.fav_landmarks) + len(st.session_state.fav_restaurants)
         st.caption(f"❤️ В обраному: {n_fav}")
-        st.caption(f"Версія платформи: {APP_VERSION}")
-        st.caption("Демо-платформа про м. Вінниця, зроблена на Streamlit.")
+        st.caption(f"🚀 Версія платформи: {APP_VERSION}")
+        st.caption("🌆 Демо-платформа про м. Вінниця, зроблена на Streamlit.")
 
     pages[st.session_state.page]()
 
