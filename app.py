@@ -14,6 +14,7 @@ import re
 import json
 import csv
 import io
+import os
 from datetime import date, datetime, timedelta
 
 try:
@@ -27,6 +28,25 @@ try:
     HAS_PANDAS = True
 except ImportError:
     HAS_PANDAS = False
+
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, HRFlowable
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
+
+import difflib
+try:
+    from rapidfuzz import fuzz as _rf_fuzz
+    HAS_RAPIDFUZZ = True
+except ImportError:
+    HAS_RAPIDFUZZ = False
 
 # =========================================================
 #                       НАЛАШТУВАННЯ СТОРІНКИ
@@ -570,17 +590,18 @@ KNOWLEDGE_BASE = {
                   "всі вони мають багату історію та цікаву архітектуру.",
     },
     "парк": {
-        "keywords": ["парк", "прогулянка", "відпочинок", "дружби народів", "кемпа", "ботанічний"],
+        "keywords": ["парк", "прогулянка", "відпочинок", "дружби народів", "кемпа", "ботанічний", "погуляти", "зелень"],
         "answer": "🌳 Для прогулянок радимо: **Парк Дружби народів** (алеї, атракціони), "
                   "острів **Кемпа** (краєвиди на річку) та **Ботанічний сад «Поділля»** (тиша й природа).",
     },
     "ресторан": {
-        "keywords": ["ресторан", "їжа", "поїсти", "кафе", "де поїсти", "кухня", "веган"],
+        "keywords": ["ресторан", "їжа", "поїсти", "кафе", "де поїсти", "кухня", "веган",
+                     "перекусити", "голодний", "їдальня", "смачно поїсти", "пообідати", "повечеряти"],
         "answer": "🍽️ Рекомендую переглянути розділ **«Ресторани»** — там є підбірка закладів з рейтингами, "
                   "адресами й контактами: від української кухні до суші, стейків і веганських страв.",
     },
     "готель": {
-        "keywords": ["готель", "хостел", "де зупинитись", "проживання", "ночівля"],
+        "keywords": ["готель", "хостел", "де зупинитись", "проживання", "ночівля", "заночувати", "переночувати"],
         "answer": "🏨 У розділі **«Про місто» → Проживання** є варіанти готелів і хостелів різної цінової категорії.",
     },
     "транспорт": {
@@ -650,33 +671,127 @@ QUICK_QUESTIONS = [
     "Склади маршрут на день",
 ]
 
+# Теми, що прив'язані до конкретної, унікальної пам'ятки — потрібно для контекстної пам'яті:
+# якщо бот щойно розповів про цю тему, наступне уточнювальне питання ("а скільки коштує?")
+# буде застосоване саме до цієї пам'ятки.
+TOPIC_TO_LANDMARK = {
+    "фонтан": "Фонтан Roshen",
+    "пирогов": "Музей-садиба М.І. Пирогова «Вишня»",
+    "вежа": "Водонапірна вежа",
+    "мури": "Вінницькі мури (Мури)",
+}
+
+# Уточнювальні (follow-up) фрази — не прив'язані до конкретної теми, а стосуються
+# того, про що йшлося щойно (контекст розмови).
+FOLLOWUP_PRICE = ["скільки коштує", "яка ціна", "почому", "вартість", "це платно", "скільки це коштує", "ціна квитка"]
+FOLLOWUP_HOURS = ["коли працює", "графік роботи", "розклад роботи", "о котрій", "до котрої", "коли можна прийти"]
+FOLLOWUP_ADDRESS = ["де знаходиться", "яка адреса", "де це", "куди йти", "як туди дістатися", "де це знаходиться"]
+FOLLOWUP_DURATION = ["скільки часу", "як довго", "тривалість відвідування", "скільки треба часу"]
+
+
+def _fuzzy_ratio(a: str, b: str) -> float:
+    """Ступінь схожості двох рядків (0-100). Використовує найкращу доступну бібліотеку:
+    rapidfuzz -> fuzzywuzzy -> стандартний difflib (завжди доступний, без встановлення).
+    Це дозволяє боту розуміти запити з друкарськими помилками та синонімами."""
+    if HAS_RAPIDFUZZ:
+        return _rf_fuzz.ratio(a, b)
+    try:
+        from fuzzywuzzy import fuzz as _fw_fuzz
+        return _fw_fuzz.ratio(a, b)
+    except ImportError:
+        pass
+    return difflib.SequenceMatcher(None, a, b).ratio() * 100
+
+
+FUZZY_THRESHOLD = 78  # від 0 до 100; нижче — толерантніше до помилок, вище — суворіше
+
+
+def _keyword_score(text_clean: str, keywords) -> int:
+    """Оцінює збіг тексту користувача з ключовими словами теми.
+    Точний підрядок дає 2 бали (сильний сигнал), нечіткий збіг (помилка/синонім) — 1 бал."""
+    words = [w for w in text_clean.split() if len(w) > 2]
+    score = 0
+    for kw in keywords:
+        if kw in text_clean:
+            score += 2
+            continue
+        if " " in kw:
+            if _fuzzy_ratio(kw, text_clean) >= FUZZY_THRESHOLD:
+                score += 1
+        else:
+            if any(_fuzzy_ratio(kw, w) >= FUZZY_THRESHOLD for w in words):
+                score += 1
+    return score
+
+
+def _matches_any(text_clean: str, phrases) -> bool:
+    """Перевіряє, чи текст користувача відповідає одній із фраз (точно або нечітко)."""
+    for p in phrases:
+        if p in text_clean:
+            return True
+        if _fuzzy_ratio(p, text_clean) >= FUZZY_THRESHOLD:
+            return True
+    return False
+
 
 def get_bot_response(user_text: str) -> str:
-    """Проста rule-based логіка чат-бота на основі ключових слів."""
+    """Логіка чат-бота: розпізнавання ключових слів + нечіткий пошук (typo/синоніми-стійкий)
+    та контекстна пам'ять — бот пам'ятає останню згадану пам'ятку/тему й розуміє уточнення."""
     text = user_text.lower().strip()
     text_clean = re.sub(r"[^\w\sа-яіїєґ]", "", text)
 
+    ctx = st.session_state.chat_context
+
     if any(g in text_clean for g in GREETINGS):
         return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте мене про пам'ятки, ресторани, "
-                "події, готелі, погоду, освіту чи маршрут — і я підкажу!")
+                "події, готелі, погоду, освіту чи маршрут — і я підкажу! До речі, я пам'ятаю "
+                "контекст розмови 🧠 — можна ставити уточнювальні питання.")
 
     if any(t in text_clean for t in THANKS):
         return "Будь ласка! 😊 Якщо ще щось цікавить — питайте."
 
-    best_match = None
-    best_score = 0
+    # 1) Уточнювальне питання про конкретну щойно згадану пам'ятку
+    if ctx.get("last_landmark"):
+        name_to_item = {i["name"]: i for i in LANDMARKS}
+        item = name_to_item.get(ctx["last_landmark"])
+        if item:
+            if _matches_any(text_clean, FOLLOWUP_PRICE):
+                return f"💵 Вхід до «{item['name']}» коштує: **{item['price']}**."
+            if _matches_any(text_clean, FOLLOWUP_HOURS):
+                return f"🕒 Графік роботи «{item['name']}»: **{item['hours']}**."
+            if _matches_any(text_clean, FOLLOWUP_ADDRESS):
+                return f"📍 «{item['name']}» знаходиться за адресою: **{item['address']}**."
+            if _matches_any(text_clean, FOLLOWUP_DURATION):
+                return f"⏱ Огляд «{item['name']}» зазвичай займає близько **{item['duration']} хв**."
+
+    # 2) Уточнення про ціни в контексті теми "ресторани" (без прив'язки до одного закладу)
+    if ctx.get("last_topic") == "ресторан" and _matches_any(text_clean, FOLLOWUP_PRICE):
+        cheapest = min(RESTAURANTS, key=lambda r: len(r["price"]))
+        priciest = max(RESTAURANTS, key=lambda r: len(r["price"]))
+        return (
+            "💵 Ціни в ресторанах Вінниці різняться: від бюджетних закладів на кшталт "
+            f"«{cheapest['name']}» ({cheapest['price']}) до преміальних, як "
+            f"«{priciest['name']}» ({priciest['price']}). Детальніше — на сторінці «Ресторани»."
+        )
+
+    # 3) Пошук найкращої теми: точні ключові слова + нечіткий (typo/синонім-стійкий) пошук
+    best_topic, best_score = None, 0
     for topic, data in KNOWLEDGE_BASE.items():
-        score = sum(1 for kw in data["keywords"] if kw in text_clean)
+        score = _keyword_score(text_clean, data["keywords"])
         if score > best_score:
             best_score = score
-            best_match = data["answer"]
+            best_topic = topic
 
-    if best_match:
-        return best_match
+    if best_topic and best_score > 0:
+        ctx["last_topic"] = best_topic
+        ctx["last_landmark"] = TOPIC_TO_LANDMARK.get(best_topic)
+        return KNOWLEDGE_BASE[best_topic]["answer"]
 
     return ("🤔 Вибачте, я поки не знаю відповіді на це питання. Спробуйте запитати про фонтан Roshen, "
             "музей Пирогова, Вінницькі мури, церкви, парки, ресторани, готелі, транспорт, погоду, "
             "освіту, історію, події чи маршрут по місту.")
+
+
 
 
 # =========================================================
@@ -708,6 +823,8 @@ def init_state():
         st.session_state.transport_positions = None
     if "transport_tick" not in st.session_state:
         st.session_state.transport_tick = 0
+    if "chat_context" not in st.session_state:
+        st.session_state.chat_context = {"last_topic": None, "last_landmark": None}
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -888,6 +1005,162 @@ def route_to_text(route, finish):
     for i, stop in enumerate(route, start=1):
         lines.append(f"{i}. {stop['name']} — {stop['start']}–{stop['end']} ({stop['duration']} хв) · {stop['address']}")
     return "\n".join(lines)
+
+
+# --- Генерація PDF-гіда (reportlab) ------------------------------------------
+# Для коректного відображення кирилиці потрібен TTF-шрифт з підтримкою укр. літер
+# (стандартні PDF-шрифти Helvetica/Times цього не вміють). Шукаємо поширені шрифти
+# в системі; якщо не знайдено — акуратно транслітеруємо текст у латиницю,
+# щоб PDF все одно згенерувався коректно, без "квадратиків" замість літер.
+CANDIDATE_REGULAR_FONTS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    "C:/Windows/Fonts/arial.ttf",
+    "C:/Windows/Fonts/tahoma.ttf",
+    "/Library/Fonts/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+]
+CANDIDATE_BOLD_FONTS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",
+    "C:/Windows/Fonts/tahomabd.ttf",
+]
+
+UA_TRANSLIT_TABLE = {
+    "а": "a", "б": "b", "в": "v", "г": "h", "ґ": "g", "д": "d", "е": "e", "є": "ie",
+    "ж": "zh", "з": "z", "и": "y", "і": "i", "ї": "i", "й": "i", "к": "k", "л": "l",
+    "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch", "ь": "",
+    "ю": "iu", "я": "ia", "'": "", "’": "", "–": "-", "—": "-",
+}
+
+
+def transliterate_ua(text):
+    """Запасний варіант для PDF без кириличного шрифту: транслітерує укр. текст у латиницю."""
+    result = []
+    for ch in text:
+        lower = ch.lower()
+        if lower in UA_TRANSLIT_TABLE:
+            repl = UA_TRANSLIT_TABLE[lower]
+            if ch.isupper() and repl:
+                repl = repl[0].upper() + repl[1:]
+            result.append(repl)
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
+def _find_font(paths):
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _register_pdf_fonts():
+    """Реєструє TTF-шрифт із кирилицею для reportlab. Повертає (regular, bold, знайдено_кирилицю)."""
+    if not HAS_REPORTLAB:
+        return None, None, False
+    regular = _find_font(CANDIDATE_REGULAR_FONTS)
+    bold = _find_font(CANDIDATE_BOLD_FONTS) or regular
+    if not regular:
+        return "Helvetica", "Helvetica-Bold", False
+    try:
+        pdfmetrics.registerFont(TTFont("GuideFont", regular))
+        pdfmetrics.registerFont(TTFont("GuideFont-Bold", bold))
+        return "GuideFont", "GuideFont-Bold", True
+    except Exception:
+        return "Helvetica", "Helvetica-Bold", False
+
+
+def generate_pdf_guide(landmark_names, title="Мій путівник по Вінниці", schedule=None):
+    """Формує гарно оформлений PDF-гід із вибраними пам'ятками.
+    schedule: необов'язковий dict {назва_пам'ятки: 'HH:MM–HH:MM'} для маршруту.
+    Повертає (pdf_bytes, warning) де warning не None, якщо кирилицю довелось транслітерувати
+    або якщо reportlab взагалі не встановлено."""
+    if not HAS_REPORTLAB:
+        return None, "no-reportlab"
+
+    font_name, font_bold, cyrillic_ok = _register_pdf_fonts()
+
+    def T(text):
+        return text if cyrillic_ok else transliterate_ua(text)
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        topMargin=20 * mm, bottomMargin=18 * mm, leftMargin=18 * mm, rightMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "GuideTitle", parent=styles["Title"], fontName=font_bold, fontSize=24,
+        textColor=colors.HexColor("#1b5e20"), spaceAfter=8, alignment=1,
+    )
+    subtitle_style = ParagraphStyle(
+        "GuideSubtitle", parent=styles["Normal"], fontName=font_name, fontSize=11,
+        textColor=colors.HexColor("#555555"), alignment=1, spaceAfter=4,
+    )
+    h2_style = ParagraphStyle(
+        "GuideH2", parent=styles["Heading2"], fontName=font_bold, fontSize=15,
+        textColor=colors.HexColor("#1b5e20"), spaceBefore=10, spaceAfter=4,
+    )
+    meta_style = ParagraphStyle(
+        "GuideMeta", parent=styles["Normal"], fontName=font_name, fontSize=9.5,
+        textColor=colors.HexColor("#2e7d32"), spaceAfter=6, leading=14,
+    )
+    body_style = ParagraphStyle(
+        "GuideBody", parent=styles["Normal"], fontName=font_name, fontSize=10.5,
+        textColor=colors.HexColor("#222222"), spaceAfter=10, leading=15,
+    )
+    warn_style = ParagraphStyle(
+        "GuideWarn", parent=styles["Normal"], fontName="Helvetica-Oblique", fontSize=8.5,
+        textColor=colors.HexColor("#b71c1c"), alignment=1,
+    )
+
+    story = [
+        Spacer(1, 40),
+        Paragraph(T(title), title_style),
+        Paragraph(T("Особистий путівник, згенерований платформою «Моя Вінниця»"), subtitle_style),
+        Paragraph(T(f"Дата створення: {datetime.now().strftime('%d.%m.%Y %H:%M')}"), subtitle_style),
+        Paragraph(T(f"Кількість пам'яток: {len(landmark_names)}"), subtitle_style),
+    ]
+    if not cyrillic_ok:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(
+            "Note: no Cyrillic-capable font found on this system, "
+            "so text below is transliterated to Latin letters.",
+            warn_style,
+        ))
+    story.append(PageBreak())
+
+    name_to_item = {i["name"]: i for i in LANDMARKS}
+    for idx, name in enumerate(landmark_names, start=1):
+        item = name_to_item.get(name)
+        if not item:
+            continue
+        story.append(Paragraph(T(f"{idx}. {item['name']}"), h2_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#a5d6a7"), spaceAfter=6))
+
+        meta_lines = []
+        if schedule and name in schedule:
+            meta_lines.append(T(f"Час у маршруті: {schedule[name]}"))
+        meta_lines += [
+            T(f"Категорія: {item['category']}"),
+            T(f"Адреса: {item['address']}"),
+            T(f"Графік роботи: {item['hours']}"),
+            T(f"Вартість входу: {item['price']}"),
+            T(f"Орієнтовний час відвідування: {item['duration']} хв"),
+        ]
+        story.append(Paragraph("<br/>".join(meta_lines), meta_style))
+        story.append(Paragraph(T(item["desc"]), body_style))
+        story.append(Spacer(1, 4))
+
+    doc.build(story)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    return pdf_bytes, (None if cyrillic_ok else "no-cyrillic-font")
 
 
 # =========================================================
@@ -1515,7 +1788,19 @@ def page_feedback():
 
 def page_chatbot():
     st.header("🤖 Чат-бот — віртуальний гід по Вінниці")
-    st.caption("Запитайте про пам'ятки, ресторани, готелі, події, транспорт, погоду, освіту чи маршрут по місту.")
+    st.caption(
+        "Запитайте про пам'ятки, ресторани, готелі, події, транспорт, погоду, освіту чи маршрут по місту. "
+        "Бот розуміє запити навіть з друкарськими помилками та пам'ятає контекст розмови 🧠"
+    )
+
+    ctx = st.session_state.chat_context
+    if ctx.get("last_landmark") or ctx.get("last_topic"):
+        remembered = ctx.get("last_landmark") or ctx.get("last_topic")
+        cc1, cc2 = st.columns([4, 1])
+        cc1.info(f"🧠 Пам'ятаю, що ми говорили про: **{remembered}** — можете уточнювати (ціна, графік, адреса тощо).")
+        if cc2.button("🔄 Забути", use_container_width=True):
+            st.session_state.chat_context = {"last_topic": None, "last_landmark": None}
+            st.rerun()
 
     st.write("**Швидкі запитання:**")
     cols = st.columns(3)
@@ -1542,6 +1827,7 @@ def page_chatbot():
         st.session_state.chat_history = [
             {"role": "assistant", "content": "Чат очищено. Чим можу допомогти?"}
         ]
+        st.session_state.chat_context = {"last_topic": None, "last_landmark": None}
         st.rerun()
 
 
@@ -1593,6 +1879,58 @@ def page_export_import():
         "🍽️ Ресторани (CSV)", data=restaurants_to_csv(),
         file_name="vinnytsia_restaurants.csv", mime="text/csv",
     )
+
+    section_divider("🌿")
+    st.subheader("📄 PDF-гід із вибраними пам'ятками")
+    st.caption(
+        "Згенеруйте гарно оформлений PDF-путівник — зручно роздрукувати перед прогулянкою "
+        "або зберегти на телефоні для офлайн-перегляду."
+    )
+
+    if not HAS_REPORTLAB:
+        st.warning(
+            "Для генерації PDF потрібна бібліотека `reportlab`. Встановіть її: "
+            "`pip install reportlab` (вже додано в requirements.txt)."
+        )
+    else:
+        default_selection = sorted(st.session_state.fav_landmarks) or [i["name"] for i in LANDMARKS[:5]]
+        pdf_names = st.multiselect(
+            "Пам'ятки для включення в PDF",
+            [i["name"] for i in LANDMARKS],
+            default=default_selection,
+            key="pdf_landmark_select",
+        )
+        include_route_in_pdf = st.checkbox(
+            "Додати час відвідування з останнього побудованого маршруту (сторінка «Маршрут»)",
+            value=bool(st.session_state.last_route),
+        )
+
+        if st.button("📄 Згенерувати PDF-гід", type="primary"):
+            if not pdf_names:
+                st.warning("Оберіть хоча б одну пам'ятку для PDF-гіда.")
+            else:
+                schedule = None
+                if include_route_in_pdf and st.session_state.last_route:
+                    schedule = {
+                        stop["name"]: f"{stop['start']}–{stop['end']}"
+                        for stop in st.session_state.last_route
+                    }
+                pdf_bytes, warning = generate_pdf_guide(pdf_names, schedule=schedule)
+                if pdf_bytes is None:
+                    st.error("Не вдалося згенерувати PDF: бібліотека reportlab недоступна.")
+                else:
+                    if warning == "no-cyrillic-font":
+                        st.info(
+                            "ℹ️ На цьому комп'ютері не знайдено шрифт із кирилицею, тому текст у PDF "
+                            "транслітеровано латиницею, щоб уникнути «квадратиків» замість літер."
+                        )
+                    st.success("PDF-гід готовий! 🎉")
+                    st.download_button(
+                        "⬇️ Завантажити PDF-гід",
+                        data=pdf_bytes,
+                        file_name="vinnytsia_guide.pdf",
+                        mime="application/pdf",
+                    )
 
     section_divider("🌿")
     st.subheader("🧭 Експорт маршруту")
