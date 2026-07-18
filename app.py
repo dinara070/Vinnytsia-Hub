@@ -30,6 +30,19 @@ except ImportError:
     HAS_PANDAS = False
 
 try:
+    import folium
+    from streamlit_folium import st_folium
+    HAS_FOLIUM = True
+except ImportError:
+    HAS_FOLIUM = False
+
+try:
+    import plotly.express as px
+    HAS_PLOTLY = True
+except ImportError:
+    HAS_PLOTLY = False
+
+try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
@@ -60,7 +73,14 @@ st.set_page_config(
 
 VINNYTSIA_LAT = 49.2331
 VINNYTSIA_LON = 28.4682
-APP_VERSION = "1.3"
+APP_VERSION = "1.4"
+
+# Пароль адмін-панелі: беремо з st.secrets (рекомендовано для продакшн-деплою через
+# .streamlit/secrets.toml -> [general] admin_password = "..."), інакше — демо-пароль за замовчуванням.
+try:
+    ADMIN_PASSWORD = st.secrets.get("admin_password", "vinnytsia2026")
+except Exception:
+    ADMIN_PASSWORD = "vinnytsia2026"
 
 # Емодзі-іконки для категорій, типів і навігації — суто візуальне покращення,
 # кольорова гама та стиль платформи залишаються незмінними.
@@ -70,13 +90,16 @@ PAGE_ICONS = {
     "Події": "🎉",
     "Ресторани": "🍽️",
     "Маршрут": "🧭",
+    "Карта": "📍",
     "Мої плани": "📔",
     "Транспорт онлайн": "🚌",
+    "Аналітика": "📊",
     "Обране": "❤️",
     "Чат-бот": "🤖",
     "Про місто": "ℹ️",
     "Зворотний зв'язок": "📝",
     "Експорт/Імпорт": "💾",
+    "Адмін-панель": "🛠️",
 }
 
 CATEGORY_ICONS = {
@@ -138,8 +161,28 @@ FACTS = [
     "Місто розташоване на обох берегах Південного Бугу, з'єднаних кількома мостами.",
 ]
 
-# Кожна пам'ятка: категорія, опис, адреса, теги, час відвідування (хв),
-# графік роботи, орієнтовна вартість входу, базовий рейтинг
+
+def wiki_commons_url(filename: str, width: int = 900) -> str:
+    """Будує стабільне пряме посилання на РЕАЛЬНЕ фото з Wikimedia Commons (вільна ліцензія
+    CC BY-SA) через офіційний механізм Special:FilePath — не потребує знання MD5-хешу файлу
+    і є стандартним, стабільним способом хотлінкінгу зображень Commons."""
+    from urllib.parse import quote
+    encoded = quote(filename.replace(" ", "_"), safe="().,;")
+    return f"https://commons.wikimedia.org/wiki/Special:FilePath/{encoded}?width={width}"
+
+
+# Реальні фото пам'яток Вінниці з Wikimedia Commons (вільні ліцензії CC BY-SA / суспільне надбання).
+# Для пам'яток без власного фото використано тематично найближче реальне фото міста.
+_PHOTO_ROSHEN = wiki_commons_url("ROSHEN Vinnitsa 2008 G1.jpg")
+_PHOTO_PIROGOV = wiki_commons_url("Музей-садиба Пирогова вул. Пирогова.JPG")
+_PHOTO_MURY = wiki_commons_url("Вінниця, вул. Мури 4.jpg")
+_PHOTO_VEZHA = wiki_commons_url("Водонапірна вежа Вінниця.jpg")
+_PHOTO_KOSTEL = wiki_commons_url("Вінниця - Костел пресвятої Діви Марії Ангельської.jpg")
+_PHOTO_PARK = wiki_commons_url("Вінниця. Парк Горького. Вхід.JPG")
+_PHOTO_SOBORNA = wiki_commons_url("Вул. Соборна, 81 (Вінниця).JPG")
+
+# Кожна пам'ятка: категорія, опис, адреса, теги, час відвідування (хв), графік роботи,
+# орієнтовна вартість входу, базовий рейтинг, координати (lat/lon, приблизні — для карти)
 LANDMARKS = [
     {
         "name": "Фонтан Roshen",
@@ -152,12 +195,9 @@ LANDMARKS = [
         "hours": "Травень–Жовтень, шоу ~21:00 та ~22:00",
         "price": "Безкоштовно",
         "base_rating": 4.9,
-        "img": "https://picsum.photos/seed/vinnytsialandmark1/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark1a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark1b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark1c/700/450",
-        ],
+        "lat": 49.2331, "lon": 28.4861,
+        "img": _PHOTO_ROSHEN,
+        "gallery": [_PHOTO_ROSHEN, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
     {
         "name": "Музей-садиба М.І. Пирогова «Вишня»",
@@ -170,12 +210,9 @@ LANDMARKS = [
         "hours": "Вт–Нд, 09:00–17:00",
         "price": "60 грн",
         "base_rating": 4.8,
-        "img": "https://picsum.photos/seed/vinnytsialandmark2/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark2a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark2b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark2c/700/450",
-        ],
+        "lat": 49.1975, "lon": 28.455,
+        "img": _PHOTO_PIROGOV,
+        "gallery": [_PHOTO_PIROGOV, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
     {
         "name": "Вінницькі мури (Мури)",
@@ -188,12 +225,9 @@ LANDMARKS = [
         "hours": "Цілодобово (зовнішній огляд)",
         "price": "Безкоштовно",
         "base_rating": 4.5,
-        "img": "https://picsum.photos/seed/vinnytsialandmark3/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark3a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark3b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark3c/700/450",
-        ],
+        "lat": 49.2323, "lon": 28.4799,
+        "img": _PHOTO_MURY,
+        "gallery": [_PHOTO_MURY, _PHOTO_SOBORNA, _PHOTO_PARK],
     },
     {
         "name": "Водонапірна вежа",
@@ -205,12 +239,9 @@ LANDMARKS = [
         "hours": "Ср–Нд, 10:00–18:00",
         "price": "40 грн",
         "base_rating": 4.6,
-        "img": "https://picsum.photos/seed/vinnytsialandmark4/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark4a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark4b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark4c/700/450",
-        ],
+        "lat": 49.236, "lon": 28.477,
+        "img": _PHOTO_VEZHA,
+        "gallery": [_PHOTO_VEZHA, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
     {
         "name": "Спасо-Преображенський кафедральний собор",
@@ -222,12 +253,9 @@ LANDMARKS = [
         "hours": "Щодня, 07:00–19:00",
         "price": "Безкоштовно",
         "base_rating": 4.7,
-        "img": "https://picsum.photos/seed/vinnytsialandmark5/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark5a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark5b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark5c/700/450",
-        ],
+        "lat": 49.2325, "lon": 28.4805,
+        "img": _PHOTO_MURY,
+        "gallery": [_PHOTO_MURY, _PHOTO_SOBORNA, _PHOTO_PARK],
     },
     {
         "name": "Костел Пресвятої Діви Марії Ангельської",
@@ -239,12 +267,9 @@ LANDMARKS = [
         "hours": "Щодня, 08:00–18:00",
         "price": "Безкоштовно",
         "base_rating": 4.6,
-        "img": "https://picsum.photos/seed/vinnytsialandmark6/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark6a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark6b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark6c/700/450",
-        ],
+        "lat": 49.2333, "lon": 28.478,
+        "img": _PHOTO_KOSTEL,
+        "gallery": [_PHOTO_KOSTEL, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
     {
         "name": "Парк Дружби народів (Центральний парк)",
@@ -256,12 +281,9 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.7,
-        "img": "https://picsum.photos/seed/vinnytsialandmark7/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark7a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark7b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark7c/700/450",
-        ],
+        "lat": 49.228, "lon": 28.456,
+        "img": _PHOTO_PARK,
+        "gallery": [_PHOTO_PARK, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
     {
         "name": "Театральна площа",
@@ -273,12 +295,9 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.5,
-        "img": "https://picsum.photos/seed/vinnytsialandmark8/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark8a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark8b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark8c/700/450",
-        ],
+        "lat": 49.2352, "lon": 28.4805,
+        "img": _PHOTO_SOBORNA,
+        "gallery": [_PHOTO_SOBORNA, _PHOTO_MURY, _PHOTO_PARK],
     },
     {
         "name": "Музей історії міста Вінниці",
@@ -290,12 +309,9 @@ LANDMARKS = [
         "hours": "Вт–Нд, 09:00–17:00",
         "price": "50 грн",
         "base_rating": 4.4,
-        "img": "https://picsum.photos/seed/vinnytsialandmark9/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark9a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark9b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark9c/700/450",
-        ],
+        "lat": 49.2335, "lon": 28.4785,
+        "img": _PHOTO_SOBORNA,
+        "gallery": [_PHOTO_SOBORNA, _PHOTO_MURY, _PHOTO_PARK],
     },
     {
         "name": "Синагога «Бейт Кнесет»",
@@ -307,12 +323,9 @@ LANDMARKS = [
         "hours": "За розкладом богослужінь",
         "price": "Безкоштовно",
         "base_rating": 4.5,
-        "img": "https://picsum.photos/seed/vinnytsialandmark10/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark10a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark10b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark10c/700/450",
-        ],
+        "lat": 49.2318, "lon": 28.482,
+        "img": _PHOTO_MURY,
+        "gallery": [_PHOTO_MURY, _PHOTO_SOBORNA, _PHOTO_PARK],
     },
     {
         "name": "Аптека-музей",
@@ -325,12 +338,9 @@ LANDMARKS = [
         "hours": "Пн–Сб, 09:00–19:00",
         "price": "30 грн",
         "base_rating": 4.6,
-        "img": "https://picsum.photos/seed/vinnytsialandmark11/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark11a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark11b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark11c/700/450",
-        ],
+        "lat": 49.2345, "lon": 28.4815,
+        "img": _PHOTO_SOBORNA,
+        "gallery": [_PHOTO_SOBORNA, _PHOTO_MURY, _PHOTO_PARK],
     },
     {
         "name": "Пам'ятник Устиму Кармалюку",
@@ -343,12 +353,9 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.2,
-        "img": "https://picsum.photos/seed/vinnytsialandmark12/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark12a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark12b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark12c/700/450",
-        ],
+        "lat": 49.2338, "lon": 28.4795,
+        "img": _PHOTO_SOBORNA,
+        "gallery": [_PHOTO_SOBORNA, _PHOTO_MURY, _PHOTO_PARK],
     },
     {
         "name": "Вулиця Соборна",
@@ -361,12 +368,9 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.7,
-        "img": "https://picsum.photos/seed/vinnytsialandmark13/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark13a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark13b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark13c/700/450",
-        ],
+        "lat": 49.234, "lon": 28.479,
+        "img": _PHOTO_SOBORNA,
+        "gallery": [_PHOTO_SOBORNA, _PHOTO_MURY, _PHOTO_PARK],
     },
     {
         "name": "Кемпа (острів відпочинку)",
@@ -379,12 +383,9 @@ LANDMARKS = [
         "hours": "Цілодобово",
         "price": "Безкоштовно",
         "base_rating": 4.6,
-        "img": "https://picsum.photos/seed/vinnytsialandmark14/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark14a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark14b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark14c/700/450",
-        ],
+        "lat": 49.2325, "lon": 28.4845,
+        "img": _PHOTO_ROSHEN,
+        "gallery": [_PHOTO_ROSHEN, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
     {
         "name": "Ботанічний сад «Поділля»",
@@ -397,12 +398,9 @@ LANDMARKS = [
         "hours": "Щодня, 08:00–18:00",
         "price": "20 грн",
         "base_rating": 4.5,
-        "img": "https://picsum.photos/seed/vinnytsialandmark15/500/320",
-        "gallery": [
-            "https://picsum.photos/seed/vinnytsialandmark15a/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark15b/700/450",
-            "https://picsum.photos/seed/vinnytsialandmark15c/700/450",
-        ],
+        "lat": 49.2225, "lon": 28.4515,
+        "img": _PHOTO_PARK,
+        "gallery": [_PHOTO_PARK, _PHOTO_SOBORNA, _PHOTO_MURY],
     },
 ]
 
@@ -1041,6 +1039,19 @@ def init_state():
         st.session_state.transport_tick = 0
     if "chat_context" not in st.session_state:
         st.session_state.chat_context = {"last_topic": None, "entity_type": None, "entity_name": None}
+    if "is_admin" not in st.session_state:
+        st.session_state.is_admin = False
+    if "page_views" not in st.session_state:
+        st.session_state.page_views = {}
+    if "session_started_at" not in st.session_state:
+        st.session_state.session_started_at = datetime.now().isoformat(timespec="seconds")
+    if "_last_seen_page" not in st.session_state:
+        st.session_state._last_seen_page = None
+    # Рахуємо ПЕРЕХОДИ між сторінками (а не кожен технічний rerun) — проста аналітика активності
+    current_page = st.session_state.page
+    if st.session_state._last_seen_page != current_page:
+        st.session_state.page_views[current_page] = st.session_state.page_views.get(current_page, 0) + 1
+        st.session_state._last_seen_page = current_page
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -1079,6 +1090,30 @@ def average_rating(landmark_name, base_rating):
     total = base_rating + sum(r["rating"] for r in revs)
     count = 1 + len(revs)
     return round(total / count, 2), len(revs)
+
+
+# --- Геопросторові функції (Geospatial) ----------------------------------------
+
+def haversine_km(lat1, lon1, lat2, lon2) -> float:
+    """Відстань між двома точками на Землі у кілометрах (формула гаверсинуса)."""
+    import math
+    r = 6371.0  # радіус Землі, км
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
+    return 2 * r * math.asin(min(1, math.sqrt(a)))
+
+
+def find_nearest_landmarks(lat, lon, n=5, pool=None):
+    """Повертає n найближчих пам'яток до заданої точки, відсортованих за відстанню (км)."""
+    pool = pool if pool is not None else LANDMARKS
+    with_dist = [
+        {**item, "distance_km": round(haversine_km(lat, lon, item["lat"], item["lon"]), 2)}
+        for item in pool
+    ]
+    with_dist.sort(key=lambda x: x["distance_km"])
+    return with_dist[:n]
 
 
 def build_route(selected_names, start_time_str):
@@ -1545,6 +1580,7 @@ def page_home():
     st.subheader("⚡ Швидкий доступ")
     row1 = st.columns(4)
     row2 = st.columns(4)
+    row3 = st.columns(4)
     if row1[0].button("🗺️ Пам'ятки", use_container_width=True):
         st.session_state.page = "Пам'ятки"; st.rerun()
     if row1[1].button("🎉 Події", use_container_width=True):
@@ -1553,13 +1589,17 @@ def page_home():
         st.session_state.page = "Ресторани"; st.rerun()
     if row1[3].button("🧭 Маршрут", use_container_width=True):
         st.session_state.page = "Маршрут"; st.rerun()
-    if row2[0].button("📔 Мої плани", use_container_width=True):
+    if row2[0].button("📍 Карта", use_container_width=True):
+        st.session_state.page = "Карта"; st.rerun()
+    if row2[1].button("📔 Мої плани", use_container_width=True):
         st.session_state.page = "Мої плани"; st.rerun()
-    if row2[1].button("🚌 Транспорт онлайн", use_container_width=True):
+    if row2[2].button("🚌 Транспорт онлайн", use_container_width=True):
         st.session_state.page = "Транспорт онлайн"; st.rerun()
-    if row2[2].button("🤖 Чат-бот", use_container_width=True):
+    if row2[3].button("📊 Аналітика", use_container_width=True):
+        st.session_state.page = "Аналітика"; st.rerun()
+    if row3[0].button("🤖 Чат-бот", use_container_width=True):
         st.session_state.page = "Чат-бот"; st.rerun()
-    if row2[3].button("💾 Експорт/Імпорт", use_container_width=True):
+    if row3[1].button("💾 Експорт/Імпорт", use_container_width=True):
         st.session_state.page = "Експорт/Імпорт"; st.rerun()
 
     section_divider("💚")
@@ -1623,6 +1663,7 @@ def page_landmarks():
         filtered = sorted(filtered, key=lambda x: x["duration"])
 
     st.write(f"Знайдено: **{len(filtered)}** з {len(LANDMARKS)}")
+    st.caption("📷 Фото: Wikimedia Commons, ліцензія CC BY-SA (вільне використання з атрибуцією).")
 
     cols = st.columns(2)
     for idx, item in enumerate(filtered):
@@ -1818,6 +1859,71 @@ def page_route():
     )
 
 
+CATEGORY_MAP_COLORS = {
+    "Розваги": "red", "Музей": "blue", "Історія": "darkred", "Архітектура": "orange",
+    "Церква": "purple", "Парк": "green", "Центр": "cadetblue", "Релігія": "purple",
+    "Пам'ятник": "gray",
+}
+
+
+def page_map():
+    st.header("📍 Інтерактивна карта Вінниці")
+    st.caption("Усі пам'ятки на карті міста з фільтрами за категорією та пошуком найближчих місць.")
+
+    categories = sorted(set(i["category"] for i in LANDMARKS))
+    selected_cats = st.multiselect("Фільтр за категорією", categories, default=categories)
+    only_free = st.checkbox("Показати лише безкоштовні", value=False)
+
+    filtered = [i for i in LANDMARKS if i["category"] in selected_cats]
+    if only_free:
+        filtered = [i for i in filtered if i["price"] == "Безкоштовно"]
+
+    st.write(f"На карті: **{len(filtered)}** з {len(LANDMARKS)} пам'яток")
+
+    if HAS_FOLIUM:
+        m = folium.Map(location=[VINNYTSIA_LAT, VINNYTSIA_LON], zoom_start=13, tiles="OpenStreetMap")
+        for item in filtered:
+            color = CATEGORY_MAP_COLORS.get(item["category"], "blue")
+            popup_html = (
+                f"<b>{item['name']}</b><br>{item['category']}<br>"
+                f"💵 {item['price']} · ⏱ {item['duration']} хв<br>📍 {item['address']}"
+            )
+            folium.Marker(
+                location=[item["lat"], item["lon"]],
+                popup=folium.Popup(popup_html, max_width=250),
+                tooltip=item["name"],
+                icon=folium.Icon(color=color, icon="info-sign"),
+            ).add_to(m)
+        st_folium(m, use_container_width=True, height=480, key="landmarks_map")
+    elif HAS_PANDAS:
+        st.warning(
+            "ℹ️ Для повноцінної інтерактивної карти з підписами встановіть `folium` та "
+            "`streamlit-folium` (вже додано в requirements.txt). Наразі показано спрощену карту."
+        )
+        map_df = pd.DataFrame([{"lat": i["lat"], "lon": i["lon"]} for i in filtered])
+        st.map(map_df)
+    else:
+        st.error("Для відображення карти потрібен `pandas` або `folium`. Встановіть залежності з requirements.txt.")
+
+    section_divider("📍")
+    st.subheader("🧭 Знайти найближчі пам'ятки")
+    st.caption("Вкажіть свої координати (наприклад, з Google Maps) — і я знайду найближчі місця.")
+
+    c1, c2, c3 = st.columns([1, 1, 1])
+    user_lat = c1.number_input("Ваша широта (lat)", value=VINNYTSIA_LAT, format="%.4f")
+    user_lon = c2.number_input("Ваша довгота (lon)", value=VINNYTSIA_LON, format="%.4f")
+    n_nearest = c3.slider("Скільки показати", 1, 10, 5)
+
+    if st.button("🔎 Знайти найближчі", type="primary"):
+        nearest = find_nearest_landmarks(user_lat, user_lon, n=n_nearest, pool=filtered or LANDMARKS)
+        for item in nearest:
+            cat_icon = CATEGORY_ICONS.get(item["category"], "📍")
+            st.markdown(
+                f"{cat_icon} **{item['name']}** — 📏 {item['distance_km']} км · "
+                f"📍 {item['address']} · 💵 {item['price']}"
+            )
+
+
 def page_my_plans():
     st.header("📔 Мої плани — хронологія відвідувань")
     st.caption("Особистий щоденник подорожі: позначайте пам'ятки як відвідані на сторінці «Пам'ятки», "
@@ -1938,6 +2044,126 @@ def page_transport_live():
         _time.sleep(2)
         simulate_transport_tick()
         st.rerun()
+
+
+def _bar_chart(df, x, y, title, color=None):
+    """Малює стовпчикову діаграму: plotly, якщо доступний (гарніше), інакше вбудований st.bar_chart."""
+    if HAS_PLOTLY:
+        fig = px.bar(df, x=x, y=y, color=color or x, title=title,
+                     color_discrete_sequence=px.colors.sequential.Greens_r)
+        fig.update_layout(showlegend=False, height=350, margin=dict(t=40, b=10, l=10, r=10))
+        st.plotly_chart(fig, use_container_width=True)
+    elif HAS_PANDAS:
+        st.caption(title)
+        st.bar_chart(df.set_index(x)[y])
+    else:
+        st.table(df)
+
+
+def page_analytics():
+    st.header("📊 Аналітика та статистика")
+    st.caption("Огляд контенту платформи та вашої особистої активності.")
+
+    tab1, tab2, tab3 = st.tabs(["🏙️ Контент платформи", "🙋 Моя активність", "🍽️ Ресторани"])
+
+    # --- Вкладка 1: загальна статистика контенту ---------------------------------
+    with tab1:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("🗺️ Пам'яток", len(LANDMARKS))
+        c2.metric("🍽️ Ресторанів", len(RESTAURANTS))
+        c3.metric("🎉 Подій", len(EVENTS))
+        c4.metric("🏨 Готелів", len(HOTELS))
+
+        section_divider("📊")
+        if HAS_PANDAS:
+            cat_counts = {}
+            for i in LANDMARKS:
+                cat_counts[i["category"]] = cat_counts.get(i["category"], 0) + 1
+            cat_df = pd.DataFrame({"Категорія": list(cat_counts.keys()), "Кількість": list(cat_counts.values())})
+            _bar_chart(cat_df, "Категорія", "Кількість", "Пам'ятки за категоріями")
+
+            st.markdown("---")
+            free_count = sum(1 for i in LANDMARKS if i["price"] == "Безкоштовно")
+            paid_count = len(LANDMARKS) - free_count
+            price_df = pd.DataFrame({"Тип": ["Безкоштовно", "Платно"], "Кількість": [free_count, paid_count]})
+            _bar_chart(price_df, "Тип", "Кількість", "Безкоштовні vs платні пам'ятки")
+
+            st.markdown("---")
+            avg_ratings = [average_rating(i["name"], i["base_rating"])[0] for i in LANDMARKS]
+            rating_df = pd.DataFrame({"Пам'ятка": [i["name"] for i in LANDMARKS], "Рейтинг": avg_ratings})
+            rating_df = rating_df.sort_values("Рейтинг", ascending=False).head(10)
+            _bar_chart(rating_df, "Пам'ятка", "Рейтинг", "Топ-10 пам'яток за рейтингом")
+
+            st.markdown("---")
+            month_counts = {}
+            for e in EVENTS:
+                month_counts[e["month"]] = month_counts.get(e["month"], 0) + 1
+            months_ua = ["", "Січ", "Лют", "Бер", "Кв", "Тра", "Чер", "Лип", "Сер", "Вер", "Жов", "Лис", "Гру"]
+            events_df = pd.DataFrame({
+                "Місяць": [months_ua[m] for m in sorted(month_counts)],
+                "Подій": [month_counts[m] for m in sorted(month_counts)],
+            })
+            _bar_chart(events_df, "Місяць", "Подій", "Події за місяцями")
+        else:
+            st.info("Встановіть `pandas`, щоб побачити графіки: `pip install pandas`.")
+
+    # --- Вкладка 2: особиста активність користувача -------------------------------
+    with tab2:
+        total_landmarks = len(LANDMARKS)
+        visited_n = len(st.session_state.visited)
+        fav_n = len(st.session_state.fav_landmarks) + len(st.session_state.fav_restaurants)
+        reviews_n = sum(len(v) for v in st.session_state.reviews.values())
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("✅ Відвідано", f"{visited_n}/{total_landmarks}")
+        c2.metric("❤️ В обраному", fav_n)
+        c3.metric("💬 Відгуків залишено", reviews_n)
+        c4.metric("📝 Фідбеків надіслано", len(st.session_state.feedback_log))
+
+        progress = visited_n / total_landmarks if total_landmarks else 0
+        st.progress(progress, text=f"Прогрес дослідження міста: {int(progress * 100)}%")
+
+        section_divider("🙋")
+        st.subheader("🕘 Активність по розділах цієї сесії")
+        if st.session_state.page_views and HAS_PANDAS:
+            pv_df = pd.DataFrame({
+                "Розділ": list(st.session_state.page_views.keys()),
+                "Переходів": list(st.session_state.page_views.values()),
+            }).sort_values("Переходів", ascending=False)
+            _bar_chart(pv_df, "Розділ", "Переходів", "Кількість переходів на розділ (поточна сесія)")
+        else:
+            st.caption("Дані з'являться після навігації по розділах платформи.")
+
+        st.caption(f"🕐 Сесію розпочато: {st.session_state.session_started_at}")
+
+    # --- Вкладка 3: аналітика ресторанів -------------------------------------------
+    with tab3:
+        if HAS_PANDAS:
+            rest_df = pd.DataFrame(RESTAURANTS)
+            c1, c2 = st.columns(2)
+            with c1:
+                type_counts = rest_df["type"].value_counts().reset_index()
+                type_counts.columns = ["Тип кухні", "Кількість"]
+                _bar_chart(type_counts, "Тип кухні", "Кількість", "Ресторани за типом кухні")
+            with c2:
+                price_counts = rest_df["price"].value_counts().reset_index()
+                price_counts.columns = ["Цінник", "Кількість"]
+                _bar_chart(price_counts, "Цінник", "Кількість", "Розподіл за ціновою категорією")
+
+            st.markdown("---")
+            if HAS_PLOTLY:
+                fig = px.scatter(
+                    rest_df, x="price", y="rating", text="name", color="type",
+                    title="Рейтинг vs цінова категорія",
+                    labels={"price": "Цінник", "rating": "Рейтинг", "type": "Тип кухні"},
+                )
+                fig.update_traces(textposition="top center")
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.dataframe(rest_df[["name", "type", "rating", "price"]], use_container_width=True, hide_index=True)
+        else:
+            st.info("Встановіть `pandas`, щоб побачити графіки ресторанів.")
 
 
 def page_favorites():
@@ -2180,6 +2406,140 @@ def page_export_import():
         st.info("Ще немає складеного маршруту. Перейдіть на сторінку «Маршрут», щоб створити його.")
 
 
+def page_admin():
+    st.header("🛠️ Адмін-панель")
+
+    if not st.session_state.is_admin:
+        st.caption("Цей розділ доступний лише адміністраторам платформи.")
+        with st.form("admin_login"):
+            pwd = st.text_input("Пароль адміністратора", type="password")
+            submitted = st.form_submit_button("🔓 Увійти", type="primary")
+            if submitted:
+                if pwd == ADMIN_PASSWORD:
+                    st.session_state.is_admin = True
+                    st.success("Вхід виконано успішно!")
+                    st.rerun()
+                else:
+                    st.error("Невірний пароль. Спробуйте ще раз.")
+        st.caption(
+            "ℹ️ Демо-пароль за замовчуванням: `vinnytsia2026`. Для продакшн-деплою змініть його "
+            "через `.streamlit/secrets.toml` → `admin_password = \"...\"`, щоб не використовувати "
+            "пароль за замовчуванням."
+        )
+        return
+
+    c_top1, c_top2 = st.columns([4, 1])
+    c_top1.success("✅ Ви увійшли як адміністратор.")
+    if c_top2.button("🚪 Вийти", use_container_width=True):
+        st.session_state.is_admin = False
+        st.rerun()
+
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["📊 Системна статистика", "💬 Модерація відгуків", "📝 Модерація фідбеку", "⚙️ Дані та обслуговування"]
+    )
+
+    # --- Системна статистика (поточної сесії) ---------------------------------
+    with tab1:
+        st.caption(
+            "⚠️ Це демо-застосунок без спільної бази даних — статистика відображає дані лише "
+            "**поточної сесії браузера**, а не всіх користувачів платформи."
+        )
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("❤️ Обраних пам'яток", len(st.session_state.fav_landmarks))
+        c2.metric("❤️ Обраних ресторанів", len(st.session_state.fav_restaurants))
+        c3.metric("✅ Відвідано", len(st.session_state.visited))
+        c4.metric("💬 Відгуків", sum(len(v) for v in st.session_state.reviews.values()))
+
+        st.markdown("---")
+        st.subheader("🕘 Переходи по розділах (поточна сесія)")
+        if st.session_state.page_views:
+            if HAS_PANDAS:
+                pv_df = pd.DataFrame({
+                    "Розділ": list(st.session_state.page_views.keys()),
+                    "Переходів": list(st.session_state.page_views.values()),
+                }).sort_values("Переходів", ascending=False)
+                st.dataframe(pv_df, use_container_width=True, hide_index=True)
+            else:
+                st.json(st.session_state.page_views)
+        else:
+            st.caption("Ще немає даних.")
+
+        st.caption(f"🕐 Сесію розпочато: {st.session_state.session_started_at}")
+
+    # --- Модерація відгуків -------------------------------------------------------
+    with tab2:
+        st.caption("Перегляньте та за потреби видаліть відгуки, залишені відвідувачами на сторінці «Пам'ятки».")
+        if not any(st.session_state.reviews.values()):
+            st.info("Відгуків поки немає.")
+        else:
+            for landmark_name, revs in list(st.session_state.reviews.items()):
+                if not revs:
+                    continue
+                st.markdown(f"**🗺️ {landmark_name}**")
+                for idx, r in enumerate(revs):
+                    with st.container(border=True):
+                        rc1, rc2 = st.columns([5, 1])
+                        rc1.markdown(f"{'⭐' * r['rating']} — **{r['author']}**")
+                        rc1.caption(r["text"])
+                        if rc2.button("🗑️ Видалити", key=f"admin_del_review_{landmark_name}_{idx}"):
+                            st.session_state.reviews[landmark_name].pop(idx)
+                            st.rerun()
+
+    # --- Модерація фідбеку ---------------------------------------------------------
+    with tab3:
+        st.caption("Перегляньте та за потреби видаліть повідомлення зі сторінки «Зворотний зв'язок».")
+        if not st.session_state.feedback_log:
+            st.info("Фідбеків поки немає.")
+        else:
+            for idx, fb in enumerate(list(st.session_state.feedback_log)):
+                with st.container(border=True):
+                    fc1, fc2 = st.columns([5, 1])
+                    fc1.markdown(f"{'⭐' * fb['rating']} — **{fb['name']}**")
+                    fc1.caption(fb["message"])
+                    if fc2.button("🗑️ Видалити", key=f"admin_del_fb_{idx}"):
+                        st.session_state.feedback_log.pop(idx)
+                        st.rerun()
+
+            csv_buf = io.StringIO()
+            writer = csv.writer(csv_buf)
+            writer.writerow(["Ім'я", "Оцінка", "Повідомлення"])
+            for fb in st.session_state.feedback_log:
+                writer.writerow([fb["name"], fb["rating"], fb["message"]])
+            st.download_button(
+                "⬇️ Експортувати фідбек (CSV)",
+                data=csv_buf.getvalue(),
+                file_name="feedback_export.csv",
+                mime="text/csv",
+            )
+
+    # --- Дані та обслуговування -----------------------------------------------------
+    with tab4:
+        st.caption("Технічні дії з даними поточної сесії. Використовуйте обережно.")
+        st.download_button(
+            "⬇️ Завантажити повний знімок сесії (JSON)",
+            data=export_snapshot(),
+            file_name="admin_session_snapshot.json",
+            mime="application/json",
+        )
+
+        st.markdown("---")
+        st.warning("⚠️ Дії нижче незворотні в межах поточної сесії.")
+        rc1, rc2, rc3 = st.columns(3)
+        if rc1.button("🗑️ Очистити всі відгуки", use_container_width=True):
+            st.session_state.reviews = {}
+            st.success("Відгуки очищено.")
+            st.rerun()
+        if rc2.button("🗑️ Очистити фідбек", use_container_width=True):
+            st.session_state.feedback_log = []
+            st.success("Фідбек очищено.")
+            st.rerun()
+        if rc3.button("🔄 Скинути всю сесію", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.success("Сесію скинуто.")
+            st.rerun()
+
+
 # =========================================================
 #                       ГОЛОВНА ЛОГІКА / НАВІГАЦІЯ
 # =========================================================
@@ -2194,13 +2554,16 @@ def main():
         "Події": page_events,
         "Ресторани": page_restaurants,
         "Маршрут": page_route,
+        "Карта": page_map,
         "Мої плани": page_my_plans,
         "Транспорт онлайн": page_transport_live,
+        "Аналітика": page_analytics,
         "Обране": page_favorites,
         "Чат-бот": page_chatbot,
         "Про місто": page_about,
         "Зворотний зв'язок": page_feedback,
         "Експорт/Імпорт": page_export_import,
+        "Адмін-панель": page_admin,
     }
 
     with st.sidebar:
