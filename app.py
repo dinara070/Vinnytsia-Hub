@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Платформа "Моя Вінниця" — інформаційний портал про місто Вінниця
 з чат-ботом-гідом, маршрутизатором, обраним, відгуками, live-погодою
@@ -661,18 +662,31 @@ KNOWLEDGE_BASE = {
 GREETINGS = ["привіт", "вітаю", "добрий день", "доброго дня", "хай", "hello", "hi"]
 THANKS = ["дякую", "спасибі", "дяка", "thanks"]
 
+
+def _contains_word(text_clean: str, words) -> bool:
+    """Перевіряє збіг ЦІЛИХ слів (на відміну від простого підрядка), щоб короткі слова
+    на кшталт 'hi' не спрацьовували всередині інших слів (наприклад, 'sushi')."""
+    tokens = set(text_clean.split())
+    for w in words:
+        if " " in w:
+            if w in text_clean:
+                return True
+        elif w in tokens:
+            return True
+    return False
+
 QUICK_QUESTIONS = [
     "Розкажи про фонтан Roshen",
-    "Де музей Пирогова?",
-    "Які події найближчим часом?",
-    "Порадь ресторан",
-    "Як дістатися до Вінниці?",
+    "Порадь щось безкоштовне",
+    "Що подивитись з дітьми?",
+    "Розкажи про Steak House Bull",
+    "Коли VinnytsiaJazzFest?",
     "Склади маршрут на день",
 ]
 
 # Теми, що прив'язані до конкретної, унікальної пам'ятки — потрібно для контекстної пам'яті:
-# якщо бот щойно розповів про цю тему, наступне уточнювальне питання ("а скільки коштує?")
-# буде застосоване саме до цієї пам'ятки.
+# якщо бот щойно відповів через загальну тему KNOWLEDGE_BASE, а не через розпізнавання
+# конкретної сутності, наступне уточнення все одно буде прив'язане до цієї пам'ятки.
 TOPIC_TO_LANDMARK = {
     "фонтан": "Фонтан Roshen",
     "пирогов": "Музей-садиба М.І. Пирогова «Вишня»",
@@ -733,27 +747,192 @@ def _matches_any(text_clean: str, phrases) -> bool:
     return False
 
 
+# --- Розпізнавання сутностей ---------------------------------------------------
+# Аліаси дозволяють боту відповідати про КОЖНУ з 15 пам'яток окремо (а не лише
+# про 4 найпопулярніші), навіть якщо користувач називає її коротко чи неточно.
+LANDMARK_ALIASES = {
+    "фонтан": "Фонтан Roshen", "рошен": "Фонтан Roshen", "roshen": "Фонтан Roshen",
+    "пирогов": "Музей-садиба М.І. Пирогова «Вишня»", "вишня": "Музей-садиба М.І. Пирогова «Вишня»",
+    "мури": "Вінницькі мури (Мури)", "фортеця": "Вінницькі мури (Мури)",
+    "вежа": "Водонапірна вежа", "водонапірна": "Водонапірна вежа",
+    "спасо": "Спасо-Преображенський кафедральний собор", "кафедральний собор": "Спасо-Преображенський кафедральний собор",
+    "костел": "Костел Пресвятої Діви Марії Ангельської",
+    "дружби народів": "Парк Дружби народів (Центральний парк)", "центральний парк": "Парк Дружби народів (Центральний парк)",
+    "театральна площа": "Театральна площа",
+    "музей історії": "Музей історії міста Вінниці",
+    "синагога": "Синагога «Бейт Кнесет»", "бейт кнесет": "Синагога «Бейт Кнесет»",
+    "аптека": "Аптека-музей", "аптека-музей": "Аптека-музей",
+    "кармалюк": "Пам'ятник Устиму Кармалюку",
+    "вулиця соборна": "Вулиця Соборна", "пішохідна вулиця": "Вулиця Соборна",
+    "кемпа": "Кемпа (острів відпочинку)", "острів відпочинку": "Кемпа (острів відпочинку)",
+    "ботанічний": "Ботанічний сад «Поділля»", "поділля": "Ботанічний сад «Поділля»",
+}
+
+_LANDMARK_BY_NAME = {i["name"]: i for i in LANDMARKS}
+_RESTAURANT_BY_NAME = {r["name"]: r for r in RESTAURANTS}
+_EVENT_BY_NAME = {e["name"]: e for e in EVENTS}
+
+
+def _find_landmark_mention(text_clean: str):
+    words = [w for w in text_clean.split() if len(w) > 2]
+    best_name, best_score = None, 0
+    for alias, name in LANDMARK_ALIASES.items():
+        if alias in text_clean:
+            return name  # точний підрядок — миттєве повернення
+        if len(alias) <= 3:
+            continue  # надто короткі аліаси нечітко не порівнюємо (ризик хибних збігів)
+        score = (
+            _fuzzy_ratio(alias, text_clean) if " " in alias
+            else max((_fuzzy_ratio(alias, w) for w in words), default=0)
+        )
+        if score > best_score:
+            best_score, best_name = score, name
+    return best_name if best_score >= FUZZY_THRESHOLD else None
+
+
+def _find_restaurant_mention(text_clean: str):
+    words = [w for w in text_clean.split() if len(w) > 2]
+    best_name, best_score = None, 0
+    for r in RESTAURANTS:
+        simple = re.sub(r"[«»'\"]", "", r["name"]).lower()
+        if simple in text_clean:
+            return r["name"]
+        for part in simple.split():
+            if len(part) <= 3:
+                continue
+            score = max((_fuzzy_ratio(part, w) for w in words), default=0)
+            if score > best_score:
+                best_score, best_name = score, r["name"]
+    return best_name if best_score >= FUZZY_THRESHOLD else None
+
+
+def _find_event_mention(text_clean: str):
+    best_name, best_score = None, 0
+    for e in EVENTS:
+        simple = re.sub(r"[«»'\"]", "", e["name"]).lower()
+        if simple in text_clean:
+            return e["name"]
+        score = _fuzzy_ratio(simple, text_clean)
+        if score > best_score:
+            best_score, best_name = score, e["name"]
+    return best_name if best_score >= FUZZY_THRESHOLD else None
+
+
+def _landmark_answer(item) -> str:
+    cat_icon = CATEGORY_ICONS.get(item["category"], "📍")
+    return (
+        f"{cat_icon} **{item['name']}** ({item['category']})\n\n{item['desc']}\n\n"
+        f"📍 Адреса: {item['address']} · 🕒 Графік: {item['hours']} · 💵 Вартість: {item['price']} · "
+        f"⏱ ~{item['duration']} хв"
+    )
+
+
+def _restaurant_answer(r) -> str:
+    r_icon = RESTAURANT_ICONS.get(r["type"], "🍽️")
+    return (
+        f"{r_icon} **{r['name']}** ({r['type']}) — рейтинг ⭐{r['rating']}, цінник {r['price']}\n\n"
+        f"📍 {r['address']} · 🕒 {r['hours']} · ☎ {r['phone']}"
+    )
+
+
+def _event_answer(e) -> str:
+    e_icon = EVENT_ICONS.get(e["type"], "🎉")
+    return (
+        f"{e_icon} **{e['name']}** ({e['type']}) — {e['date']}\n\n{e['desc']}\n\n"
+        f"📍 {e['place']} · 💵 {e['price']} · 📅 Тривалість ~{e['days']} дн."
+    )
+
+
+# --- Малі розмовні репліки (small talk) ----------------------------------------
+SMALLTALK = [
+    (["як справи", "як ти", "як твої справи"],
+     "У мене все чудово, дякую! 😊 Готовий показати вам Вінницю — питайте про будь-що."),
+    (["хто ти", "що ти таке", "як тебе звати", "твоє ім'я"],
+     "Я віртуальний гід платформи «Моя Вінниця» 🤖 — знаю все про 15 пам'яток, ресторани, "
+     "події та можу скласти для вас маршрут."),
+    (["що ти вмієш", "чим можеш допомогти", "твої можливості", "функції"],
+     "Я вмію: 🗺️ розповідати про кожну пам'ятку окремо, 🍽️ радити ресторани, 🎉 розказувати про події, "
+     "🎯 давати персональні поради («порадь щось безкоштовне/з дітьми/романтично»), "
+     "🧠 пам'ятати контекст розмови для уточнень і 🧭 допомагати скласти маршрут. Просто питайте!"),
+    (["дякую за допомогу", "ти класний", "ти найкращий", "гарна робота"],
+     "Дуже приємно! 🥰 Звертайтесь, якщо ще щось буде цікаво."),
+]
+
+# --- Рекомендаційний рушій -----------------------------------------------------
+RECOMMEND_TRIGGERS = ["порадь", "порекомендуй", "що подивитись", "що відвідати", "куди піти", "яку пораду", "порада"]
+FILTER_FREE = ["безкоштовно", "без грошей", "не платити", "даром", "free"]
+FILTER_KIDS = ["з дітьми", "для дітей", "дитина", "дитиною", "сім'єю"]
+FILTER_ROMANTIC = ["романтично", "з коханою", "з дівчиною", "з хлопцем", "побачення", "для двох"]
+FILTER_INDOOR = ["дощ", "погана погода", "в приміщенні", "холодно", "негода"]
+FILTER_OUTDOOR = ["свіже повітря", "на вулиці", "прогулятися", "на природі"]
+
+
+def _recommend(text_clean: str) -> str:
+    import random as _random
+
+    if _matches_any(text_clean, FILTER_FREE):
+        pool = [i for i in LANDMARKS if i["price"] == "Безкоштовно"]
+        header = "💸 Безкоштовні пам'ятки, які варто відвідати:"
+    elif _matches_any(text_clean, FILTER_KIDS):
+        pool = [i for i in LANDMARKS if i["category"] in ("Парк", "Розваги")]
+        header = "👨‍👩‍👧 Чудові варіанти для родини з дітьми:"
+    elif _matches_any(text_clean, FILTER_ROMANTIC):
+        pool = [i for i in LANDMARKS if i["category"] in ("Парк", "Центр", "Розваги")]
+        header = "💞 Романтичні місця для прогулянки удвох:"
+    elif _matches_any(text_clean, FILTER_INDOOR):
+        pool = [i for i in LANDMARKS if i["category"] in ("Музей", "Церква", "Релігія")]
+        header = "🏠 Якщо погода підводить, ось варіанти в приміщенні:"
+    elif _matches_any(text_clean, FILTER_OUTDOOR):
+        pool = [i for i in LANDMARKS if i["category"] == "Парк"]
+        header = "🌳 Для прогулянки на свіжому повітрі:"
+    else:
+        pool = LANDMARKS
+        header = "⭐ Ось кілька моїх улюблених пам'яток Вінниці:"
+
+    if not pool:
+        pool = LANDMARKS
+    picks = _random.sample(pool, min(3, len(pool)))
+    lines = [header, ""]
+    for item in picks:
+        cat_icon = CATEGORY_ICONS.get(item["category"], "📍")
+        lines.append(f"{cat_icon} **{item['name']}** — {item['desc'][:80]}…")
+    lines.append("")
+    lines.append("Хочете дізнатись більше про якесь із цих місць — просто напишіть його назву 😊")
+    return "\n".join(lines)
+
+
 def get_bot_response(user_text: str) -> str:
-    """Логіка чат-бота: розпізнавання ключових слів + нечіткий пошук (typo/синоніми-стійкий)
-    та контекстна пам'ять — бот пам'ятає останню згадану пам'ятку/тему й розуміє уточнення."""
+    """Логіка чат-бота: розпізнавання конкретних пам'яток/ресторанів/подій, рекомендації за
+    фільтрами, small talk, нечіткий пошук (typo/синоніми-стійкий) та контекстна пам'ять —
+    бот пам'ятає останню згадану сутність і розуміє уточнення ("а скільки коштує?")."""
     text = user_text.lower().strip()
     text_clean = re.sub(r"[^\w\sа-яіїєґ]", "", text)
 
     ctx = st.session_state.chat_context
 
-    if any(g in text_clean for g in GREETINGS):
-        return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте мене про пам'ятки, ресторани, "
-                "події, готелі, погоду, освіту чи маршрут — і я підкажу! До речі, я пам'ятаю "
-                "контекст розмови 🧠 — можна ставити уточнювальні питання.")
+    if _contains_word(text_clean, GREETINGS):
+        return ("Вітаю! 👋 Я віртуальний гід по Вінниці. Запитайте про конкретну пам'ятку, ресторан чи подію, "
+                "попросіть пораду («порадь щось безкоштовне/з дітьми/романтично») — і я підкажу! "
+                "Я пам'ятаю контекст розмови 🧠, тож можна ставити уточнення.")
 
-    if any(t in text_clean for t in THANKS):
+    if _contains_word(text_clean, THANKS):
         return "Будь ласка! 😊 Якщо ще щось цікавить — питайте."
 
-    # 1) Уточнювальне питання про конкретну щойно згадану пам'ятку
-    if ctx.get("last_landmark"):
-        name_to_item = {i["name"]: i for i in LANDMARKS}
-        item = name_to_item.get(ctx["last_landmark"])
-        if item:
+    for triggers, reply in SMALLTALK:
+        if _matches_any(text_clean, triggers):
+            return reply
+
+    # 1) Прохання про рекомендацію (з опційними фільтрами)
+    if _matches_any(text_clean, RECOMMEND_TRIGGERS):
+        ctx["entity_type"] = None
+        ctx["entity_name"] = None
+        return _recommend(text_clean)
+
+    # 2) Уточнювальне питання про щойно згадану сутність (пам'ятку/ресторан/подію)
+    if ctx.get("entity_name"):
+        etype, ename = ctx["entity_type"], ctx["entity_name"]
+        if etype == "landmark" and ename in _LANDMARK_BY_NAME:
+            item = _LANDMARK_BY_NAME[ename]
             if _matches_any(text_clean, FOLLOWUP_PRICE):
                 return f"💵 Вхід до «{item['name']}» коштує: **{item['price']}**."
             if _matches_any(text_clean, FOLLOWUP_HOURS):
@@ -762,9 +941,39 @@ def get_bot_response(user_text: str) -> str:
                 return f"📍 «{item['name']}» знаходиться за адресою: **{item['address']}**."
             if _matches_any(text_clean, FOLLOWUP_DURATION):
                 return f"⏱ Огляд «{item['name']}» зазвичай займає близько **{item['duration']} хв**."
+        elif etype == "restaurant" and ename in _RESTAURANT_BY_NAME:
+            r = _RESTAURANT_BY_NAME[ename]
+            if _matches_any(text_clean, FOLLOWUP_PRICE):
+                return f"💵 Цінова категорія «{r['name']}»: **{r['price']}**."
+            if _matches_any(text_clean, FOLLOWUP_HOURS):
+                return f"🕒 Графік роботи «{r['name']}»: **{r['hours']}**."
+            if _matches_any(text_clean, FOLLOWUP_ADDRESS):
+                return f"📍 «{r['name']}» знаходиться за адресою: **{r['address']}**."
+        elif etype == "event" and ename in _EVENT_BY_NAME:
+            e = _EVENT_BY_NAME[ename]
+            if _matches_any(text_clean, FOLLOWUP_PRICE):
+                return f"💵 Участь у «{e['name']}»: **{e['price']}**."
+            if _matches_any(text_clean, FOLLOWUP_ADDRESS):
+                return f"📍 «{e['name']}» проходить тут: **{e['place']}**."
 
-    # 2) Уточнення про ціни в контексті теми "ресторани" (без прив'язки до одного закладу)
-    if ctx.get("last_topic") == "ресторан" and _matches_any(text_clean, FOLLOWUP_PRICE):
+    # 3) Розпізнавання згадки конкретної пам'ятки / ресторану / події
+    landmark_name = _find_landmark_mention(text_clean)
+    if landmark_name:
+        ctx["entity_type"], ctx["entity_name"] = "landmark", landmark_name
+        return _landmark_answer(_LANDMARK_BY_NAME[landmark_name])
+
+    restaurant_name = _find_restaurant_mention(text_clean)
+    if restaurant_name:
+        ctx["entity_type"], ctx["entity_name"] = "restaurant", restaurant_name
+        return _restaurant_answer(_RESTAURANT_BY_NAME[restaurant_name])
+
+    event_name = _find_event_mention(text_clean)
+    if event_name:
+        ctx["entity_type"], ctx["entity_name"] = "event", event_name
+        return _event_answer(_EVENT_BY_NAME[event_name])
+
+    # 4) Уточнення про ціни в контексті загальної теми "ресторани" (без конкретного закладу)
+    if ctx.get("entity_type") is None and ctx.get("last_topic") == "ресторан" and _matches_any(text_clean, FOLLOWUP_PRICE):
         cheapest = min(RESTAURANTS, key=lambda r: len(r["price"]))
         priciest = max(RESTAURANTS, key=lambda r: len(r["price"]))
         return (
@@ -773,7 +982,7 @@ def get_bot_response(user_text: str) -> str:
             f"«{priciest['name']}» ({priciest['price']}). Детальніше — на сторінці «Ресторани»."
         )
 
-    # 3) Пошук найкращої теми: точні ключові слова + нечіткий (typo/синонім-стійкий) пошук
+    # 5) Пошук найкращої загальної теми: точні ключові слова + нечіткий (typo/синонім-стійкий) пошук
     best_topic, best_score = None, 0
     for topic, data in KNOWLEDGE_BASE.items():
         score = _keyword_score(text_clean, data["keywords"])
@@ -783,12 +992,20 @@ def get_bot_response(user_text: str) -> str:
 
     if best_topic and best_score > 0:
         ctx["last_topic"] = best_topic
-        ctx["last_landmark"] = TOPIC_TO_LANDMARK.get(best_topic)
+        ctx["entity_type"] = "landmark" if best_topic in TOPIC_TO_LANDMARK else None
+        ctx["entity_name"] = TOPIC_TO_LANDMARK.get(best_topic)
         return KNOWLEDGE_BASE[best_topic]["answer"]
 
-    return ("🤔 Вибачте, я поки не знаю відповіді на це питання. Спробуйте запитати про фонтан Roshen, "
-            "музей Пирогова, Вінницькі мури, церкви, парки, ресторани, готелі, транспорт, погоду, "
-            "освіту, історію, події чи маршрут по місту.")
+    # 6) Останній шанс: можливо, це неточно написана назва конкретного місця?
+    if len(text_clean) >= 4:
+        all_names = list(_LANDMARK_BY_NAME) + list(_RESTAURANT_BY_NAME) + list(_EVENT_BY_NAME)
+        guess = max(all_names, key=lambda n: _fuzzy_ratio(text_clean, n.lower()))
+        if _fuzzy_ratio(text_clean, guess.lower()) >= 60:
+            return f"🤔 Не зовсім зрозумів запит. Можливо, ви мали на увазі **«{guess}»**? Спробуйте написати точніше 🙂"
+
+    return ("🤔 Вибачте, я поки не знаю відповіді на це питання. Спробуйте запитати про конкретну пам'ятку "
+            "(наприклад, костел чи Кемпу), ресторан, подію, або попросіть пораду: "
+            "«порадь щось безкоштовне / з дітьми / романтично».")
 
 
 
@@ -823,7 +1040,7 @@ def init_state():
     if "transport_tick" not in st.session_state:
         st.session_state.transport_tick = 0
     if "chat_context" not in st.session_state:
-        st.session_state.chat_context = {"last_topic": None, "last_landmark": None}
+        st.session_state.chat_context = {"last_topic": None, "entity_type": None, "entity_name": None}
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -946,19 +1163,21 @@ def simulate_transport_tick():
     return st.session_state.transport_positions
 
 
-
-    """Формує JSON-знімок усіх даних користувача для експорту."""
+def export_snapshot():
+    """Формує JSON-знімок усіх даних користувача для експорту.
+    Використовує .get() із безпечними значеннями за замовчуванням, щоб уникнути
+    помилок навіть якщо якийсь ключ з якоїсь причини відсутній у сесії."""
     snapshot = {
         "app_version": APP_VERSION,
         "exported_at": datetime.now().isoformat(timespec="seconds"),
-        "fav_landmarks": sorted(st.session_state.fav_landmarks),
-        "fav_restaurants": sorted(st.session_state.fav_restaurants),
-        "reviews": st.session_state.reviews,
-        "feedback_log": st.session_state.feedback_log,
-        "last_route": st.session_state.last_route,
-        "visited": st.session_state.visited,
+        "fav_landmarks": sorted(st.session_state.get("fav_landmarks", set())),
+        "fav_restaurants": sorted(st.session_state.get("fav_restaurants", set())),
+        "reviews": st.session_state.get("reviews", {}),
+        "feedback_log": st.session_state.get("feedback_log", []),
+        "last_route": st.session_state.get("last_route", []),
+        "visited": st.session_state.get("visited", {}),
     }
-    return json.dumps(snapshot, ensure_ascii=False, indent=2)
+    return json.dumps(snapshot, ensure_ascii=False, indent=2, default=str)
 
 
 def import_snapshot(raw_text):
@@ -969,6 +1188,7 @@ def import_snapshot(raw_text):
     st.session_state.reviews = data.get("reviews", {})
     st.session_state.feedback_log = data.get("feedback_log", [])
     st.session_state.last_route = data.get("last_route", [])
+    st.session_state.visited = data.get("visited", {})
     st.session_state.visited = data.get("visited", {})
 
 
@@ -1788,17 +2008,32 @@ def page_feedback():
 def page_chatbot():
     st.header("🤖 Чат-бот — віртуальний гід по Вінниці")
     st.caption(
-        "Запитайте про пам'ятки, ресторани, готелі, події, транспорт, погоду, освіту чи маршрут по місту. "
-        "Бот розуміє запити навіть з друкарськими помилками та пам'ятає контекст розмови 🧠"
+        "Запитайте про конкретну пам'ятку, ресторан чи подію, попросіть персональну пораду, "
+        "або дізнайтесь про транспорт, погоду, освіту чи маршрут. Бот розуміє одруківки й синоніми "
+        "та пам'ятає контекст розмови 🧠"
     )
 
+    with st.expander("🧩 Що вміє цей бот? (натисніть, щоб розгорнути)"):
+        st.markdown(
+            "- 🗺️ **Розповідає про кожну з 15 пам'яток окремо** — просто назвіть її (навіть коротко "
+            "чи з помилкою): «костел», «кемпа», «водонапирна вижа»\n"
+            "- 🍽️ **Знає кожен ресторан і подію** — «розкажи про Sushi-Ya», «коли Food Fest?»\n"
+            "- 🎯 **Дає персональні поради** — «порадь щось безкоштовне», «куди піти з дітьми», "
+            "«що подивитись, якщо дощ»\n"
+            "- 🧠 **Пам'ятає контекст** — можна уточнювати: «а скільки це коштує?», «коли працює?», "
+            "«де це знаходиться?»\n"
+            "- 💬 **Підтримує невимушену розмову** — привітання, подяки, small talk\n"
+            "- ✏️ **Стійкий до одруківок і синонімів** — «перекусити» = «ресторан», «фонтн» = «фонтан»"
+        )
+
     ctx = st.session_state.chat_context
-    if ctx.get("last_landmark") or ctx.get("last_topic"):
-        remembered = ctx.get("last_landmark") or ctx.get("last_topic")
+    remembered = ctx.get("entity_name") or ctx.get("last_topic")
+    if remembered:
+        icon = {"landmark": "🗺️", "restaurant": "🍽️", "event": "🎉"}.get(ctx.get("entity_type"), "💬")
         cc1, cc2 = st.columns([4, 1])
-        cc1.info(f"🧠 Пам'ятаю, що ми говорили про: **{remembered}** — можете уточнювати (ціна, графік, адреса тощо).")
+        cc1.info(f"🧠 Пам'ятаю, що ми говорили про: {icon} **{remembered}** — можете уточнювати (ціна, графік, адреса тощо).")
         if cc2.button("🔄 Забути", use_container_width=True):
-            st.session_state.chat_context = {"last_topic": None, "last_landmark": None}
+            st.session_state.chat_context = {"last_topic": None, "entity_type": None, "entity_name": None}
             st.rerun()
 
     st.write("**Швидкі запитання:**")
@@ -1826,7 +2061,7 @@ def page_chatbot():
         st.session_state.chat_history = [
             {"role": "assistant", "content": "Чат очищено. Чим можу допомогти?"}
         ]
-        st.session_state.chat_context = {"last_topic": None, "last_landmark": None}
+        st.session_state.chat_context = {"last_topic": None, "entity_type": None, "entity_name": None}
         st.rerun()
 
 
@@ -1982,7 +2217,18 @@ def main():
         st.caption(f"🚀 Версія платформи: {APP_VERSION}")
         st.caption("🌆 Демо-платформа про м. Вінниця, зроблена на Streamlit.")
 
-    pages[st.session_state.page]()
+    try:
+        pages[st.session_state.page]()
+    except Exception as exc:
+        st.error(
+            "😔 На цій сторінці сталася непередбачена помилка. Спробуйте оновити сторінку "
+            "або перейти в інший розділ. Розробник може побачити деталі нижче."
+        )
+        with st.expander("🔧 Технічні деталі (для розробника)"):
+            st.exception(exc)
+        if st.button("🏠 Повернутися на Головну"):
+            st.session_state.page = "Головна"
+            st.rerun()
 
 
 if __name__ == "__main__":
