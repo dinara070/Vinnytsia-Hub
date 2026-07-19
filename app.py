@@ -1,14 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Платформа "Моя Вінниця" — інформаційний портал про місто Вінниця
-з чат-ботом-гідом, маршрутизатором, обраним, відгуками, live-погодою
-та Експортом/Імпортом даних на Streamlit.
-
-Запуск:
-    pip install -r requirements.txt
-    streamlit run vinnytsia_app.py
-"""
-
 import streamlit as st
 import re
 import json
@@ -715,6 +704,7 @@ def _fuzzy_ratio(a: str, b: str) -> float:
 
 
 FUZZY_THRESHOLD = 78  # від 0 до 100; нижче — толерантніше до помилок, вище — суворіше
+ALIAS_FUZZY_THRESHOLD = 70  # трохи нижчий поріг для коротких аліасів пам'яток (відмінкові форми)
 
 
 def _keyword_score(text_clean: str, keywords) -> int:
@@ -785,7 +775,26 @@ def _find_landmark_mention(text_clean: str):
         )
         if score > best_score:
             best_score, best_name = score, name
-    return best_name if best_score >= FUZZY_THRESHOLD else None
+    return best_name if best_score >= ALIAS_FUZZY_THRESHOLD else None
+
+
+def _find_all_landmark_mentions(text_clean: str):
+    """Повертає ВСІ пам'ятки, чиї аліаси зустрічаються в тексті (точно або нечітко —
+    щоб ловити відмінкові форми на кшталт 'вежу' замість 'вежа') — потрібно для порівняння
+    двох місць в одному повідомленні."""
+    words = [w for w in text_clean.split() if len(w) > 2]
+    found = []
+    for alias, name in LANDMARK_ALIASES.items():
+        if name in found:
+            continue
+        if alias in text_clean:
+            found.append(name)
+            continue
+        if len(alias) <= 3 or " " in alias:
+            continue
+        if any(_fuzzy_ratio(alias, w) >= ALIAS_FUZZY_THRESHOLD for w in words):
+            found.append(name)
+    return found
 
 
 def _find_restaurant_mention(text_clean: str):
@@ -858,6 +867,7 @@ SMALLTALK = [
 
 # --- Рекомендаційний рушій -----------------------------------------------------
 RECOMMEND_TRIGGERS = ["порадь", "порекомендуй", "що подивитись", "що відвідати", "куди піти", "яку пораду", "порада"]
+COMPARE_TRIGGERS = ["порівняй", "порівняти", "яка різниця", "що краще", "порівняння"]
 FILTER_FREE = ["безкоштовно", "без грошей", "не платити", "даром", "free"]
 FILTER_KIDS = ["з дітьми", "для дітей", "дитина", "дитиною", "сім'єю"]
 FILTER_ROMANTIC = ["романтично", "з коханою", "з дівчиною", "з хлопцем", "побачення", "для двох"]
@@ -899,6 +909,30 @@ def _recommend(text_clean: str) -> str:
     return "\n".join(lines)
 
 
+def _compare_landmarks(name_a, name_b) -> str:
+    a, b = _LANDMARK_BY_NAME[name_a], _LANDMARK_BY_NAME[name_b]
+    avg_a, _ = average_rating(a["name"], a["base_rating"])
+    avg_b, _ = average_rating(b["name"], b["base_rating"])
+    lines = [
+        f"⚖️ **Порівняння: {a['name']} vs {b['name']}**",
+        "",
+        f"| | {a['name']} | {b['name']} |",
+        "|---|---|---|",
+        f"| Категорія | {a['category']} | {b['category']} |",
+        f"| ⭐ Рейтинг | {avg_a} | {avg_b} |",
+        f"| 💵 Вартість | {a['price']} | {b['price']} |",
+        f"| ⏱ Час відвідування | {a['duration']} хв | {b['duration']} хв |",
+        f"| 🕒 Графік | {a['hours']} | {b['hours']} |",
+        "",
+    ]
+    if avg_a != avg_b:
+        winner = a["name"] if avg_a > avg_b else b["name"]
+        lines.append(f"За рейтингом відвідувачів трохи попереду **{winner}** 🏆, але обидва місця варті уваги!")
+    else:
+        lines.append("Обидва місця мають однаковий рейтинг — важко обрати, тож відвідайте обидва! 😊")
+    return "\n".join(lines)
+
+
 def get_bot_response(user_text: str) -> str:
     """Логіка чат-бота: розпізнавання конкретних пам'яток/ресторанів/подій, рекомендації за
     фільтрами, small talk, нечіткий пошук (typo/синоніми-стійкий) та контекстна пам'ять —
@@ -920,13 +954,22 @@ def get_bot_response(user_text: str) -> str:
         if _matches_any(text_clean, triggers):
             return reply
 
-    # 1) Прохання про рекомендацію (з опційними фільтрами)
+    # 1) Порівняння двох пам'яток ("порівняй X і Y")
+    if _matches_any(text_clean, COMPARE_TRIGGERS):
+        mentioned = _find_all_landmark_mentions(text_clean)
+        if len(mentioned) >= 2:
+            ctx["entity_type"], ctx["entity_name"] = None, None
+            return _compare_landmarks(mentioned[0], mentioned[1])
+        return ("⚖️ Я вмію порівнювати пам'ятки! Напишіть, наприклад: "
+                "«порівняй фонтан і вежу» — назвіть дві пам'ятки в одному повідомленні.")
+
+    # 2) Прохання про рекомендацію (з опційними фільтрами)
     if _matches_any(text_clean, RECOMMEND_TRIGGERS):
         ctx["entity_type"] = None
         ctx["entity_name"] = None
         return _recommend(text_clean)
 
-    # 2) Уточнювальне питання про щойно згадану сутність (пам'ятку/ресторан/подію)
+    # 3) Уточнювальне питання про щойно згадану сутність (пам'ятку/ресторан/подію)
     if ctx.get("entity_name"):
         etype, ename = ctx["entity_type"], ctx["entity_name"]
         if etype == "landmark" and ename in _LANDMARK_BY_NAME:
@@ -954,7 +997,7 @@ def get_bot_response(user_text: str) -> str:
             if _matches_any(text_clean, FOLLOWUP_ADDRESS):
                 return f"📍 «{e['name']}» проходить тут: **{e['place']}**."
 
-    # 3) Розпізнавання згадки конкретної пам'ятки / ресторану / події
+    # 4) Розпізнавання згадки конкретної пам'ятки / ресторану / події
     landmark_name = _find_landmark_mention(text_clean)
     if landmark_name:
         ctx["entity_type"], ctx["entity_name"] = "landmark", landmark_name
@@ -999,13 +1042,44 @@ def get_bot_response(user_text: str) -> str:
         all_names = list(_LANDMARK_BY_NAME) + list(_RESTAURANT_BY_NAME) + list(_EVENT_BY_NAME)
         guess = max(all_names, key=lambda n: _fuzzy_ratio(text_clean, n.lower()))
         if _fuzzy_ratio(text_clean, guess.lower()) >= 60:
+            _log_unanswered(user_text, guessed=guess)
             return f"🤔 Не зовсім зрозумів запит. Можливо, ви мали на увазі **«{guess}»**? Спробуйте написати точніше 🙂"
 
+    _log_unanswered(user_text, guessed=None)
     return ("🤔 Вибачте, я поки не знаю відповіді на це питання. Спробуйте запитати про конкретну пам'ятку "
             "(наприклад, костел чи Кемпу), ресторан, подію, або попросіть пораду: "
             "«порадь щось безкоштовне / з дітьми / романтично».")
 
 
+def _log_unanswered(text: str, guessed=None):
+    """Записує запит, на який бот не знайшов впевненої відповіді — адміністратор бачить ці
+    запити на сторінці «Адмін-панель» і може розширити базу знань бота на їх основі."""
+    try:
+        st.session_state.unanswered_queries.append({
+            "text": text,
+            "guessed": guessed,
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        })
+    except Exception:
+        pass
+
+
+def get_quick_replies(ctx):
+    """Формує контекстні кнопки-підказки після відповіді бота — залежно від того, про яку
+    сутність чи тему щойно йшлося."""
+    etype = ctx.get("entity_type")
+    if etype == "landmark":
+        return ["💵 Скільки коштує?", "🕒 Графік роботи?", "📍 Де знаходиться?", "⏱ Скільки часу займе огляд?"]
+    if etype == "restaurant":
+        return ["💵 Яка цінова категорія?", "🕒 Графік роботи?", "📍 Де знаходиться?"]
+    if etype == "event":
+        return ["💵 Скільки коштує участь?", "📍 Де проходить?"]
+    topic = ctx.get("last_topic")
+    if topic == "парк":
+        return ["Розкажи про Парк Дружби народів", "Розкажи про Кемпу", "Розкажи про Ботанічний сад"]
+    if topic == "церква":
+        return ["Розкажи про Спасо-Преображенський собор", "Розкажи про Костел", "Розкажи про синагогу"]
+    return []
 
 
 # =========================================================
@@ -1045,6 +1119,14 @@ def init_state():
         st.session_state.page_views = {}
     if "session_started_at" not in st.session_state:
         st.session_state.session_started_at = datetime.now().isoformat(timespec="seconds")
+    if "unanswered_queries" not in st.session_state:
+        st.session_state.unanswered_queries = []  # [{"text":.., "time":..}]
+    if "bot_feedback" not in st.session_state:
+        st.session_state.bot_feedback = {}  # {msg_index: "up"/"down"}
+    if "admin_audit_log" not in st.session_state:
+        st.session_state.admin_audit_log = []  # [{"time":.., "action":..}]
+    if "admin_login_attempts" not in st.session_state:
+        st.session_state.admin_login_attempts = 0
     if "_last_seen_page" not in st.session_state:
         st.session_state._last_seen_page = None
     # Рахуємо ПЕРЕХОДИ між сторінками (а не кожен технічний rerun) — проста аналітика активності
@@ -2234,9 +2316,9 @@ def page_feedback():
 def page_chatbot():
     st.header("🤖 Чат-бот — віртуальний гід по Вінниці")
     st.caption(
-        "Запитайте про конкретну пам'ятку, ресторан чи подію, попросіть персональну пораду, "
-        "або дізнайтесь про транспорт, погоду, освіту чи маршрут. Бот розуміє одруківки й синоніми "
-        "та пам'ятає контекст розмови 🧠"
+        "Запитайте про конкретну пам'ятку, ресторан чи подію, попросіть персональну пораду або "
+        "порівняння, чи дізнайтесь про транспорт, погоду, освіту чи маршрут. Бот розуміє одруківки "
+        "й синоніми та пам'ятає контекст розмови 🧠"
     )
 
     with st.expander("🧩 Що вміє цей бот? (натисніть, щоб розгорнути)"):
@@ -2246,8 +2328,10 @@ def page_chatbot():
             "- 🍽️ **Знає кожен ресторан і подію** — «розкажи про Sushi-Ya», «коли Food Fest?»\n"
             "- 🎯 **Дає персональні поради** — «порадь щось безкоштовне», «куди піти з дітьми», "
             "«що подивитись, якщо дощ»\n"
+            "- ⚖️ **Порівнює пам'ятки** — «порівняй фонтан і вежу»\n"
             "- 🧠 **Пам'ятає контекст** — можна уточнювати: «а скільки це коштує?», «коли працює?», "
             "«де це знаходиться?»\n"
+            "- 💡 **Пропонує кнопки-підказки** після кожної відповіді, щоб швидко уточнити деталі\n"
             "- 💬 **Підтримує невимушену розмову** — привітання, подяки, small talk\n"
             "- ✏️ **Стійкий до одруківок і синонімів** — «перекусити» = «ресторан», «фонтн» = «фонтан»"
         )
@@ -2262,33 +2346,68 @@ def page_chatbot():
             st.session_state.chat_context = {"last_topic": None, "entity_type": None, "entity_name": None}
             st.rerun()
 
+    def _send(text):
+        st.session_state.chat_history.append({"role": "user", "content": text})
+        st.session_state.chat_history.append({"role": "assistant", "content": get_bot_response(text)})
+
     st.write("**Швидкі запитання:**")
     cols = st.columns(3)
     for i, q in enumerate(QUICK_QUESTIONS):
         if cols[i % 3].button(q, key=f"quick_{i}", use_container_width=True):
-            st.session_state.chat_history.append({"role": "user", "content": q})
-            st.session_state.chat_history.append({"role": "assistant", "content": get_bot_response(q)})
+            _send(q)
+            st.rerun()
+
+    # Контекстні кнопки-підказки на основі того, про що бот щойно розповів
+    quick_replies = get_quick_replies(ctx)
+    if quick_replies:
+        st.write("**💡 Можливо, вас зацікавить:**")
+        qr_cols = st.columns(len(quick_replies))
+        for i, qr in enumerate(quick_replies):
+            if qr_cols[i].button(qr, key=f"qreply_{i}_{qr}", use_container_width=True):
+                _send(qr)
+                st.rerun()
 
     section_divider("🌿")
 
-    for msg in st.session_state.chat_history:
+    for idx, msg in enumerate(st.session_state.chat_history):
         avatar = "🤖" if msg["role"] == "assistant" else "🙂"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant" and idx > 0:
+                fb = st.session_state.bot_feedback.get(idx)
+                fbc1, fbc2, fbc3 = st.columns([1, 1, 10])
+                up_label = "✅👍" if fb == "up" else "👍"
+                down_label = "✅👎" if fb == "down" else "👎"
+                if fbc1.button(up_label, key=f"fb_up_{idx}"):
+                    st.session_state.bot_feedback[idx] = "up"
+                    st.rerun()
+                if fbc2.button(down_label, key=f"fb_down_{idx}"):
+                    st.session_state.bot_feedback[idx] = "down"
+                    st.rerun()
 
     user_input = st.chat_input("Напишіть повідомлення...")
     if user_input:
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
-        response = get_bot_response(user_input)
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        _send(user_input)
         st.rerun()
 
-    if st.button("🗑️ Очистити чат"):
+    section_divider("🌿")
+    bc1, bc2 = st.columns(2)
+    if bc1.button("🗑️ Очистити чат", use_container_width=True):
         st.session_state.chat_history = [
             {"role": "assistant", "content": "Чат очищено. Чим можу допомогти?"}
         ]
         st.session_state.chat_context = {"last_topic": None, "entity_type": None, "entity_name": None}
+        st.session_state.bot_feedback = {}
         st.rerun()
+
+    chat_text = "\n\n".join(
+        f"{'Гід' if m['role'] == 'assistant' else 'Я'}: {m['content']}" for m in st.session_state.chat_history
+    )
+    bc2.download_button(
+        "⬇️ Завантажити історію чату (.txt)",
+        data=chat_text, file_name="vinnytsia_chat.txt", mime="text/plain",
+        use_container_width=True,
+    )
 
 
 def page_export_import():
@@ -2406,21 +2525,38 @@ def page_export_import():
         st.info("Ще немає складеного маршруту. Перейдіть на сторінку «Маршрут», щоб створити його.")
 
 
+def _admin_log(action: str):
+    st.session_state.admin_audit_log.append({
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "action": action,
+    })
+
+
 def page_admin():
     st.header("🛠️ Адмін-панель")
 
     if not st.session_state.is_admin:
         st.caption("Цей розділ доступний лише адміністраторам платформи.")
+
+        if st.session_state.admin_login_attempts >= 5:
+            st.error("🔒 Забагато невдалих спроб входу. Оновіть сторінку, щоб спробувати знову.")
+            return
+
         with st.form("admin_login"):
             pwd = st.text_input("Пароль адміністратора", type="password")
             submitted = st.form_submit_button("🔓 Увійти", type="primary")
             if submitted:
                 if pwd == ADMIN_PASSWORD:
                     st.session_state.is_admin = True
+                    st.session_state.admin_login_attempts = 0
+                    _admin_log("Успішний вхід адміністратора")
                     st.success("Вхід виконано успішно!")
                     st.rerun()
                 else:
-                    st.error("Невірний пароль. Спробуйте ще раз.")
+                    st.session_state.admin_login_attempts += 1
+                    _admin_log(f"Невдала спроба входу (спроба {st.session_state.admin_login_attempts}/5)")
+                    left = 5 - st.session_state.admin_login_attempts
+                    st.error(f"Невірний пароль. Залишилось спроб: {left}.")
         st.caption(
             "ℹ️ Демо-пароль за замовчуванням: `vinnytsia2026`. Для продакшн-деплою змініть його "
             "через `.streamlit/secrets.toml` → `admin_password = \"...\"`, щоб не використовувати "
@@ -2431,11 +2567,12 @@ def page_admin():
     c_top1, c_top2 = st.columns([4, 1])
     c_top1.success("✅ Ви увійшли як адміністратор.")
     if c_top2.button("🚪 Вийти", use_container_width=True):
+        _admin_log("Вихід адміністратора")
         st.session_state.is_admin = False
         st.rerun()
 
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["📊 Системна статистика", "💬 Модерація відгуків", "📝 Модерація фідбеку", "⚙️ Дані та обслуговування"]
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["📊 Статистика", "💬 Відгуки", "📝 Фідбек", "🤖 Чат-бот", "🔍 Каталог", "⚙️ Система"]
     )
 
     # --- Системна статистика (поточної сесії) ---------------------------------
@@ -2466,6 +2603,14 @@ def page_admin():
 
         st.caption(f"🕐 Сесію розпочато: {st.session_state.session_started_at}")
 
+        st.markdown("---")
+        st.subheader("🧾 Журнал дій адміністратора")
+        if st.session_state.admin_audit_log:
+            for entry in reversed(st.session_state.admin_audit_log[-15:]):
+                st.caption(f"`{entry['time']}` — {entry['action']}")
+        else:
+            st.caption("Ще немає записів у журналі.")
+
     # --- Модерація відгуків -------------------------------------------------------
     with tab2:
         st.caption("Перегляньте та за потреби видаліть відгуки, залишені відвідувачами на сторінці «Пам'ятки».")
@@ -2483,6 +2628,7 @@ def page_admin():
                         rc1.caption(r["text"])
                         if rc2.button("🗑️ Видалити", key=f"admin_del_review_{landmark_name}_{idx}"):
                             st.session_state.reviews[landmark_name].pop(idx)
+                            _admin_log(f"Видалено відгук про «{landmark_name}» від {r['author']}")
                             st.rerun()
 
     # --- Модерація фідбеку ---------------------------------------------------------
@@ -2498,6 +2644,7 @@ def page_admin():
                     fc1.caption(fb["message"])
                     if fc2.button("🗑️ Видалити", key=f"admin_del_fb_{idx}"):
                         st.session_state.feedback_log.pop(idx)
+                        _admin_log(f"Видалено фідбек від {fb['name']}")
                         st.rerun()
 
             csv_buf = io.StringIO()
@@ -2512,9 +2659,86 @@ def page_admin():
                 mime="text/csv",
             )
 
-    # --- Дані та обслуговування -----------------------------------------------------
+    # --- Аналітика чат-бота ---------------------------------------------------------
     with tab4:
-        st.caption("Технічні дії з даними поточної сесії. Використовуйте обережно.")
+        st.caption(
+            "Тут видно, з чим бот **не впорався** — це найкраще джерело ідей для розширення бази знань, "
+            "а також оцінки 👍/👎, які відвідувачі залишають під відповідями бота."
+        )
+        fb_values = list(st.session_state.bot_feedback.values())
+        n_up = fb_values.count("up")
+        n_down = fb_values.count("down")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("👍 Позитивних оцінок", n_up)
+        c2.metric("👎 Негативних оцінок", n_down)
+        satisfaction = round(100 * n_up / (n_up + n_down), 1) if (n_up + n_down) else None
+        c3.metric("😊 Задоволеність", f"{satisfaction}%" if satisfaction is not None else "—")
+
+        st.markdown("---")
+        st.subheader("❓ Незрозумілі запити")
+        if not st.session_state.unanswered_queries:
+            st.success("Поки що бот відповів на всі запити цієї сесії! 🎉")
+        else:
+            st.warning(f"Знайдено {len(st.session_state.unanswered_queries)} запит(ів), на які бот не мав впевненої відповіді.")
+            for q in reversed(st.session_state.unanswered_queries[-30:]):
+                guess_txt = f" (припущення: «{q['guessed']}»)" if q.get("guessed") else ""
+                st.markdown(f"`{q['time']}` — *{q['text']}*{guess_txt}")
+
+            uq_csv = io.StringIO()
+            writer = csv.writer(uq_csv)
+            writer.writerow(["Час", "Запит", "Припущення бота"])
+            for q in st.session_state.unanswered_queries:
+                writer.writerow([q["time"], q["text"], q.get("guessed") or ""])
+            dc1, dc2 = st.columns(2)
+            dc1.download_button(
+                "⬇️ Експортувати незрозумілі запити (CSV)",
+                data=uq_csv.getvalue(), file_name="unanswered_queries.csv", mime="text/csv",
+                use_container_width=True,
+            )
+            if dc2.button("🗑️ Очистити список", use_container_width=True):
+                st.session_state.unanswered_queries = []
+                _admin_log("Очищено список незрозумілих запитів чат-бота")
+                st.rerun()
+
+    # --- Каталог даних ---------------------------------------------------------------
+    with tab5:
+        st.caption("Перегляд довідкових каталогів платформи (лише читання — дані задані в коді застосунку).")
+        catalog_choice = st.selectbox("Каталог", ["Пам'ятки", "Ресторани", "Події", "Готелі"])
+        search_q = st.text_input("🔍 Пошук у каталозі")
+
+        if HAS_PANDAS:
+            if catalog_choice == "Пам'ятки":
+                df = pd.DataFrame(LANDMARKS)[["name", "category", "price", "duration", "hours", "address"]]
+            elif catalog_choice == "Ресторани":
+                df = pd.DataFrame(RESTAURANTS)[["name", "type", "rating", "price", "address", "hours"]]
+            elif catalog_choice == "Події":
+                df = pd.DataFrame(EVENTS)[["name", "type", "date", "price", "place"]]
+            else:
+                df = pd.DataFrame(HOTELS)
+
+            if search_q:
+                mask = df.apply(lambda row: row.astype(str).str.contains(search_q, case=False).any(), axis=1)
+                df = df[mask]
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption(f"Показано {len(df)} записів.")
+        else:
+            st.info("Встановіть `pandas`, щоб переглядати каталог у вигляді таблиці.")
+
+    # --- Стан системи -----------------------------------------------------------------
+    with tab6:
+        st.subheader("🩺 Стан залежностей")
+        deps = [
+            ("requests (погода)", HAS_REQUESTS),
+            ("pandas (таблиці/графіки)", HAS_PANDAS),
+            ("reportlab (PDF-гід)", HAS_REPORTLAB),
+            ("rapidfuzz (нечіткий пошук)", HAS_RAPIDFUZZ),
+            ("folium + streamlit-folium (карта)", HAS_FOLIUM),
+            ("plotly (аналітика)", HAS_PLOTLY),
+        ]
+        for label, ok in deps:
+            st.markdown(f"{'✅' if ok else '⚠️'} {label} — {'встановлено' if ok else 'не встановлено (є fallback)'}")
+
+        st.markdown("---")
         st.download_button(
             "⬇️ Завантажити повний знімок сесії (JSON)",
             data=export_snapshot(),
@@ -2527,10 +2751,12 @@ def page_admin():
         rc1, rc2, rc3 = st.columns(3)
         if rc1.button("🗑️ Очистити всі відгуки", use_container_width=True):
             st.session_state.reviews = {}
+            _admin_log("Очищено всі відгуки")
             st.success("Відгуки очищено.")
             st.rerun()
         if rc2.button("🗑️ Очистити фідбек", use_container_width=True):
             st.session_state.feedback_log = []
+            _admin_log("Очищено весь фідбек")
             st.success("Фідбек очищено.")
             st.rerun()
         if rc3.button("🔄 Скинути всю сесію", use_container_width=True):
