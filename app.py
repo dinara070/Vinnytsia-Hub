@@ -172,7 +172,7 @@ _PHOTO_SOBORNA = wiki_commons_url("Вул. Соборна, 81 (Вінниця).J
 
 # Кожна пам'ятка: категорія, опис, адреса, теги, час відвідування (хв), графік роботи,
 # орієнтовна вартість входу, базовий рейтинг, координати (lat/lon, приблизні — для карти)
-LANDMARKS = [
+DEFAULT_LANDMARKS = [
     {
         "name": "Фонтан Roshen",
         "category": "Розваги",
@@ -394,7 +394,7 @@ LANDMARKS = [
 ]
 
 # Події: додано тип, ціну та орієнтовну тривалість у днях
-EVENTS = [
+DEFAULT_EVENTS = [
     {
         "name": "VinnytsiaJazzFest",
         "date": "Червень",
@@ -457,7 +457,7 @@ EVENTS = [
     },
 ]
 
-RESTAURANTS = [
+DEFAULT_RESTAURANTS = [
     {
         "name": "Кафе «Вишня»", "type": "Українська кухня", "rating": 4.7, "price": "$$",
         "address": "вул. Соборна, 12", "hours": "09:00–22:00", "phone": "+380 43 200-11-22",
@@ -495,12 +495,106 @@ RESTAURANTS = [
     },
 ]
 
-HOTELS = [
+DEFAULT_HOTELS = [
     {"name": "Готель «南Buk»", "stars": 4, "price_night": "1400 грн", "address": "набережна Південного Бугу"},
     {"name": "Hotel Vinnytsia", "stars": 3, "price_night": "900 грн", "address": "центр міста"},
     {"name": "Апарт-готель «Кемпа Residence»", "stars": 4, "price_night": "1600 грн", "address": "поруч з островом Кемпа"},
     {"name": "Хостел «Дружба»", "stars": 2, "price_night": "400 грн", "address": "вул. Хмельницьке шосе"},
 ]
+
+# =========================================================
+#         ШАР ПЕРСИСТЕНТНОСТІ ДАНИХ ("БАЗА ДАНИХ") — CRUD
+# =========================================================
+# Цей застосунок не підключений до окремої СУБД (Postgres/Supabase тощо), тому як легка
+# "база даних" для контенту (пам'ятки/ресторани/події/готелі), яким керує адмін-панель,
+# використовуються JSON-файли на диску. Це дозволяє змінам зберігатися між сеансами (поки
+# застосунок працює на тому самому сервері), але при редеплої на Streamlit Cloud файлова
+# система ефемерна — для повної надійності в продакшн варто підключити зовнішню БД.
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+
+def _store_path(name: str) -> str:
+    return os.path.join(DATA_DIR, f"{name}.json")
+
+
+def load_store(name: str, default_data: list) -> list:
+    """Завантажує колекцію записів з JSON-файлу; якщо файл відсутній/пошкоджений — повертає
+    дефолтні дані (і одразу зберігає їх у файл, щоб наступні читання/записи були консистентні)."""
+    path = _store_path(name)
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return [dict(item) for item in default_data]
+
+
+def save_store(name: str, data: list) -> bool:
+    """Зберігає колекцію записів у JSON-файл. Повертає False, якщо диск недоступний для
+    запису (наприклад, деякі хмарні середовища з read-only файловою системою) — у такому
+    разі зміни діють лише до перезапуску процесу застосунку."""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(_store_path(name), "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+# Робочі колекції даних, якими користується весь застосунок — завантажені з диска
+# (або з дефолтних значень, якщо файлів ще немає).
+LANDMARKS = load_store("landmarks", DEFAULT_LANDMARKS)
+EVENTS = load_store("events", DEFAULT_EVENTS)
+RESTAURANTS = load_store("restaurants", DEFAULT_RESTAURANTS)
+HOTELS = load_store("hotels", DEFAULT_HOTELS)
+
+
+def _unique_name(base_name: str, existing_names) -> str:
+    """Гарантує унікальність назви запису (додає лічильник, якщо така назва вже є)."""
+    name = base_name.strip()
+    if name not in existing_names:
+        return name
+    i = 2
+    while f"{name} ({i})" in existing_names:
+        i += 1
+    return f"{name} ({i})"
+
+
+def crud_create(collection_name: str, collection: list, record: dict) -> dict:
+    """Додає новий запис у колекцію ('landmarks'/'restaurants'/'events'/'hotels') і зберігає на диск."""
+    existing_names = {item["name"] for item in collection}
+    record = dict(record)
+    record["name"] = _unique_name(record["name"], existing_names)
+    collection.append(record)
+    save_store(collection_name, collection)
+    return record
+
+
+def crud_update(collection_name: str, collection: list, old_name: str, updated_record: dict) -> bool:
+    """Оновлює існуючий запис (знайдений за старою назвою) новими даними і зберігає на диск."""
+    for idx, item in enumerate(collection):
+        if item["name"] == old_name:
+            collection[idx] = updated_record
+            save_store(collection_name, collection)
+            return True
+    return False
+
+
+def crud_delete(collection_name: str, collection: list, name: str) -> bool:
+    """Видаляє запис за назвою і зберігає на диск."""
+    for idx, item in enumerate(collection):
+        if item["name"] == name:
+            collection.pop(idx)
+            save_store(collection_name, collection)
+            return True
+    return False
 
 TRANSPORT_INFO = """
 **Як дістатися до Вінниці:**
@@ -775,7 +869,19 @@ def _find_landmark_mention(text_clean: str):
         )
         if score > best_score:
             best_score, best_name = score, name
-    return best_name if best_score >= ALIAS_FUZZY_THRESHOLD else None
+    if best_score >= ALIAS_FUZZY_THRESHOLD:
+        return best_name
+
+    # Fallback: пряме порівняння з повною назвою пам'ятки — потрібно для записів, доданих
+    # через адмін-панель (CRUD), у яких ще немає прописаного короткого аліасу.
+    for item in LANDMARKS:
+        simple = re.sub(r"[«»'\"()]", "", item["name"]).lower()
+        if simple in text_clean:
+            return item["name"]
+        score = _fuzzy_ratio(simple, text_clean)
+        if score > best_score:
+            best_score, best_name = score, item["name"]
+    return best_name if best_score >= FUZZY_THRESHOLD else None
 
 
 def _find_all_landmark_mentions(text_clean: str):
@@ -2259,14 +2365,18 @@ def page_favorites():
         st.subheader("🗺️ Пам'ятки")
         name_to_item = {i["name"]: i for i in LANDMARKS}
         for name in st.session_state.fav_landmarks:
-            item = name_to_item[name]
+            item = name_to_item.get(name)
+            if item is None:
+                continue  # адмін міг перейменувати/видалити цей запис
             st.markdown(f"**{item['name']}** — {item['category']} · 📍 {item['address']}")
 
     if st.session_state.fav_restaurants:
         st.subheader("🍽️ Ресторани")
         name_to_r = {r["name"]: r for r in RESTAURANTS}
         for name in st.session_state.fav_restaurants:
-            r = name_to_r[name]
+            r = name_to_r.get(name)
+            if r is None:
+                continue
             st.markdown(f"**{r['name']}** — {r['type']} · ⭐{r['rating']}")
 
 
@@ -2532,6 +2642,145 @@ def _admin_log(action: str):
     })
 
 
+# --- Форми CRUD для управління контентом в адмін-панелі -----------------------
+
+def _landmark_form(existing=None, form_key="new_landmark"):
+    """Форма створення/редагування пам'ятки. Повертає dict з даними при сабміті, інакше None."""
+    e = existing or {}
+    with st.form(form_key, clear_on_submit=(existing is None)):
+        c1, c2 = st.columns(2)
+        name = c1.text_input("Назва*", value=e.get("name", ""))
+        category = c2.text_input("Категорія*", value=e.get("category", ""), help="Напр.: Музей, Парк, Церква")
+        desc = st.text_area("Опис*", value=e.get("desc", ""))
+        c3, c4 = st.columns(2)
+        address = c3.text_input("Адреса", value=e.get("address", ""))
+        hours = c4.text_input("Графік роботи", value=e.get("hours", ""))
+        c5, c6, c7 = st.columns(3)
+        price = c5.text_input("Вартість", value=e.get("price", "Безкоштовно"))
+        duration = c6.number_input("Тривалість (хв)", min_value=5, max_value=300, step=5, value=int(e.get("duration", 30)))
+        base_rating = c7.slider("Базовий рейтинг", 1.0, 5.0, value=float(e.get("base_rating", 4.5)), step=0.1)
+        c8, c9 = st.columns(2)
+        lat = c8.number_input("Широта (lat)", value=float(e.get("lat", VINNYTSIA_LAT)), format="%.4f")
+        lon = c9.number_input("Довгота (lon)", value=float(e.get("lon", VINNYTSIA_LON)), format="%.4f")
+        tags_str = st.text_input("Теги (через кому)", value=", ".join(e.get("tags", [])))
+        img = st.text_input("URL фото", value=e.get("img", "") or wiki_commons_url("Вул. Соборна, 81 (Вінниця).JPG"))
+
+        label = "💾 Зберегти зміни" if existing else "➕ Створити пам'ятку"
+        submitted = st.form_submit_button(label, type="primary")
+        if submitted:
+            if not name.strip() or not category.strip() or not desc.strip():
+                st.error("Заповніть обов'язкові поля: назва, категорія, опис.")
+                return None
+            return {
+                "name": name.strip(), "category": category.strip(), "desc": desc.strip(),
+                "address": address.strip(), "hours": hours.strip(), "price": price.strip(),
+                "duration": int(duration), "base_rating": float(base_rating),
+                "lat": float(lat), "lon": float(lon),
+                "tags": [t.strip() for t in tags_str.split(",") if t.strip()],
+                "img": img.strip(), "gallery": [img.strip()],
+            }
+    return None
+
+
+def _restaurant_form(existing=None, form_key="new_restaurant"):
+    e = existing or {}
+    with st.form(form_key, clear_on_submit=(existing is None)):
+        c1, c2 = st.columns(2)
+        name = c1.text_input("Назва*", value=e.get("name", ""))
+        r_type = c2.text_input("Тип кухні*", value=e.get("type", ""))
+        c3, c4 = st.columns(2)
+        rating = c3.slider("Рейтинг", 1.0, 5.0, value=float(e.get("rating", 4.5)), step=0.1)
+        price = c4.selectbox("Цінник", ["$", "$$", "$$$"], index=["$", "$$", "$$$"].index(e.get("price", "$$")) if e.get("price") in ["$", "$$", "$$$"] else 1)
+        address = st.text_input("Адреса", value=e.get("address", ""))
+        c5, c6 = st.columns(2)
+        hours = c5.text_input("Графік роботи", value=e.get("hours", ""))
+        phone = c6.text_input("Телефон", value=e.get("phone", ""))
+        tags_str = st.text_input("Теги (через кому)", value=", ".join(e.get("tags", [])))
+
+        label = "💾 Зберегти зміни" if existing else "➕ Створити ресторан"
+        submitted = st.form_submit_button(label, type="primary")
+        if submitted:
+            if not name.strip() or not r_type.strip():
+                st.error("Заповніть обов'язкові поля: назва, тип кухні.")
+                return None
+            return {
+                "name": name.strip(), "type": r_type.strip(), "rating": float(rating), "price": price,
+                "address": address.strip(), "hours": hours.strip(), "phone": phone.strip(),
+                "tags": [t.strip() for t in tags_str.split(",") if t.strip()],
+            }
+    return None
+
+
+def _event_form(existing=None, form_key="new_event"):
+    e = existing or {}
+    months_ua = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень",
+                 "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"]
+    with st.form(form_key, clear_on_submit=(existing is None)):
+        name = st.text_input("Назва*", value=e.get("name", ""))
+        c1, c2, c3 = st.columns(3)
+        date_str = c1.text_input("Період (текст)", value=e.get("date", ""), help="Напр.: Червень, Липень–Серпень")
+        month = c2.selectbox("Місяць", list(range(1, 13)), format_func=lambda m: months_ua[m - 1],
+                              index=int(e.get("month", 6)) - 1)
+        e_type = c3.text_input("Тип*", value=e.get("type", ""), help="Напр.: Музика, Культура, Сім'я")
+        c4, c5 = st.columns(2)
+        price = c4.text_input("Вартість", value=e.get("price", "Безкоштовно"))
+        days = c5.number_input("Тривалість (днів)", min_value=1, max_value=60, value=int(e.get("days", 1)))
+        place = st.text_input("Місце проведення", value=e.get("place", ""))
+        desc = st.text_area("Опис*", value=e.get("desc", ""))
+
+        label = "💾 Зберегти зміни" if existing else "➕ Створити подію"
+        submitted = st.form_submit_button(label, type="primary")
+        if submitted:
+            if not name.strip() or not e_type.strip() or not desc.strip():
+                st.error("Заповніть обов'язкові поля: назва, тип, опис.")
+                return None
+            return {
+                "name": name.strip(), "date": date_str.strip(), "month": int(month), "type": e_type.strip(),
+                "price": price.strip(), "days": int(days), "desc": desc.strip(), "place": place.strip(),
+            }
+    return None
+
+
+def _hotel_form(existing=None, form_key="new_hotel"):
+    e = existing or {}
+    with st.form(form_key, clear_on_submit=(existing is None)):
+        name = st.text_input("Назва*", value=e.get("name", ""))
+        c1, c2 = st.columns(2)
+        stars = c1.slider("Зірки", 1, 5, value=int(e.get("stars", 3)))
+        price_night = c2.text_input("Ціна за ніч", value=e.get("price_night", "1000 грн"))
+        address = st.text_input("Адреса", value=e.get("address", ""))
+
+        label = "💾 Зберегти зміни" if existing else "➕ Створити готель"
+        submitted = st.form_submit_button(label, type="primary")
+        if submitted:
+            if not name.strip():
+                st.error("Заповніть назву готелю.")
+                return None
+            return {"name": name.strip(), "stars": int(stars), "price_night": price_night.strip(), "address": address.strip()}
+    return None
+
+
+# Конфігурація для узагальненого CRUD-блоку: store_name, дані, форма, підпис для картки
+CRUD_ENTITIES = {
+    "🗺️ Пам'ятки": {
+        "store": "landmarks", "data_getter": lambda: LANDMARKS, "form": _landmark_form,
+        "card": lambda r: f"**{r['name']}** — {r.get('category', '')} · 💵 {r.get('price', '')}",
+    },
+    "🍽️ Ресторани": {
+        "store": "restaurants", "data_getter": lambda: RESTAURANTS, "form": _restaurant_form,
+        "card": lambda r: f"**{r['name']}** — {r.get('type', '')} · ⭐{r.get('rating', '')}",
+    },
+    "🎉 Події": {
+        "store": "events", "data_getter": lambda: EVENTS, "form": _event_form,
+        "card": lambda r: f"**{r['name']}** — {r.get('date', '')} · {r.get('type', '')}",
+    },
+    "🏨 Готелі": {
+        "store": "hotels", "data_getter": lambda: HOTELS, "form": _hotel_form,
+        "card": lambda r: f"**{r['name']}** — {'⭐' * r.get('stars', 0)} · {r.get('price_night', '')}",
+    },
+}
+
+
 def page_admin():
     st.header("🛠️ Адмін-панель")
 
@@ -2579,8 +2828,8 @@ def page_admin():
         st.session_state.is_admin = False
         st.rerun()
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["📊 Статистика", "💬 Відгуки", "📝 Фідбек", "🤖 Чат-бот", "🔍 Каталог", "⚙️ Система"]
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+        ["📊 Статистика", "💬 Відгуки", "📝 Фідбек", "🤖 Чат-бот", "🔍 Каталог", "🗂️ Керування контентом", "⚙️ Система"]
     )
 
     # --- Системна статистика (поточної сесії) ---------------------------------
@@ -2732,8 +2981,74 @@ def page_admin():
         else:
             st.info("Встановіть `pandas`, щоб переглядати каталог у вигляді таблиці.")
 
-    # --- Стан системи -----------------------------------------------------------------
+    # --- Керування контентом: CREATE / UPDATE / DELETE --------------------------------
     with tab6:
+        st.caption(
+            "Повноцінне керування каталогом платформи: створення нових записів, редагування "
+            "та видалення існуючих. Зміни зберігаються у файлах `data/*.json` на сервері."
+        )
+        entity_label = st.selectbox("Тип контенту", list(CRUD_ENTITIES.keys()), key="crud_entity_select")
+        cfg = CRUD_ENTITIES[entity_label]
+        store_name, form_fn, card_fn = cfg["store"], cfg["form"], cfg["card"]
+        current_data = cfg["data_getter"]()
+
+        crud_mode = st.radio(
+            "Дія", ["➕ Створити новий", "✏️ Редагувати / 🗑️ Видалити існуючий"],
+            horizontal=True, key=f"crud_mode_{store_name}",
+        )
+
+        if crud_mode == "➕ Створити новий":
+            new_record = form_fn(existing=None, form_key=f"create_{store_name}")
+            if new_record is not None:
+                saved = crud_create(store_name, current_data, new_record)
+                _admin_log(f"Створено новий запис у «{entity_label}»: {saved['name']}")
+                if saved["name"] != new_record["name"]:
+                    st.info(f"ℹ️ Назва вже існувала — запис збережено як «{saved['name']}».")
+                st.success(f"✅ Запис «{saved['name']}» створено!")
+                st.rerun()
+
+        else:
+            if not current_data:
+                st.info("У цьому каталозі поки немає записів.")
+            else:
+                names = [r["name"] for r in current_data]
+                selected_name = st.selectbox("Оберіть запис", names, key=f"crud_select_{store_name}")
+                selected_idx = names.index(selected_name)
+                selected_record = current_data[selected_idx]
+
+                with st.container(border=True):
+                    st.markdown(card_fn(selected_record))
+
+                ec1, ec2 = st.columns([3, 1])
+                with ec1:
+                    with st.expander("✏️ Редагувати цей запис", expanded=False):
+                        updated = form_fn(existing=selected_record, form_key=f"edit_{store_name}_{selected_idx}")
+                        if updated is not None:
+                            ok = crud_update(store_name, current_data, selected_name, updated)
+                            if ok:
+                                _admin_log(f"Оновлено запис у «{entity_label}»: {updated['name']}")
+                                st.success("✅ Зміни збережено!")
+                                st.rerun()
+                with ec2:
+                    st.write("")
+                    st.write("")
+                    confirm_del = st.checkbox("Підтвердити видалення", key=f"confirm_del_{store_name}_{selected_idx}")
+                    if st.button("🗑️ Видалити запис", key=f"del_{store_name}_{selected_idx}", disabled=not confirm_del):
+                        crud_delete(store_name, current_data, selected_name)
+                        _admin_log(f"Видалено запис із «{entity_label}»: {selected_name}")
+                        st.success(f"🗑️ Запис «{selected_name}» видалено.")
+                        st.rerun()
+
+        st.markdown("---")
+        st.caption(
+            "⚠️ Дані зберігаються у файлах на диску сервера — це працює, поки застосунок запущено, "
+            "але на Streamlit Cloud файлова система ефемерна: зміни можуть **скинутись до дефолтних** "
+            "після передеплою чи перезапуску контейнера. Для гарантованої постійності підключіть "
+            "зовнішню БД (Postgres/Supabase) — форми та логіка CRUD вище легко переносяться на неї."
+        )
+
+    # --- Стан системи -----------------------------------------------------------------
+    with tab7:
         st.subheader("🩺 Стан залежностей")
         deps = [
             ("requests (погода)", HAS_REQUESTS),
